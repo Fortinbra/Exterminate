@@ -35,9 +35,12 @@ set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# BluePad32 configuration
+set(BLUEPAD32_ROOT ${CMAKE_CURRENT_LIST_DIR}/lib/bluepad32)
+
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(Exterminate src/main.cpp )
+add_executable(Exterminate src/main.cpp src/exterminate_platform.cpp )
 
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
@@ -57,12 +60,39 @@ target_link_libraries(Exterminate
 target_include_directories(Exterminate PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/src
+        ${BLUEPAD32_ROOT}/src/components/bluepad32/include
 )
+
+# Needed when using BTstack from our branch
+include_directories(${PICO_SDK_PATH}/lib/btstack/3rd-party/bluedroid/encoder/include)
+include_directories(${PICO_SDK_PATH}/lib/btstack/3rd-party/bluedroid/decoder/include)
+include_directories(${PICO_SDK_PATH}/lib/btstack/src)
 
 # Add any user requested libraries
 target_link_libraries(Exterminate 
         hardware_pio
+        pico_cyw43_arch_none
+        pico_btstack_classic
+        pico_btstack_cyw43
+        bluepad32
         )
+
+# Needed for btstack_config.h / sdkconfig.h
+# so that libbluepad32 can include them
+include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
+
+# Add compile definitions to help with BluePad32 compatibility
+add_compile_definitions(NDEBUG)
+
+# Add BluePad32 subdirectory
+add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
+
+# Workaround for missing assert.h includes in BluePad32 - apply only to C files
+target_compile_options(bluepad32 PRIVATE $<$<COMPILE_LANGUAGE:C>:-include assert.h>)
+
+# Make sure BluePad32 can find our config files
+target_include_directories(bluepad32 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 pico_add_extra_outputs(Exterminate)
 
