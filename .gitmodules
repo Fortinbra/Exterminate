@@ -1,0 +1,3 @@
+[submodule "lib/bluepad32"]
+	path = lib/bluepad32
+	url = https://github.com/ricardoquesada/bluepad32.git
