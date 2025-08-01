@@ -40,7 +40,7 @@ set(BLUEPAD32_ROOT ${CMAKE_CURRENT_LIST_DIR}/lib/bluepad32)
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(Exterminate src/main.cpp src/exterminate_platform.cpp )
+add_executable(Exterminate src/main.cpp src/exterminate_platform.cpp src/MotorController.cpp )
 
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
@@ -72,6 +72,7 @@ include_directories(${PICO_SDK_PATH}/lib/btstack/src)
 # Add any user requested libraries
 target_link_libraries(Exterminate 
         hardware_pio
+        hardware_pwm
         pico_cyw43_arch_none
         pico_btstack_classic
         pico_btstack_cyw43
