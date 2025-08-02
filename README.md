@@ -1,5 +1,13 @@
 # Exterminate
 
+> **⚠️ Development Status Notice**
+> 
+> This project is currently **untested on physical hardware** as the author is awaiting component delivery. The codebase has been developed with significant assistance from **GitHub Copilot (Claude Sonnet 3.5)** and represents a theoretical implementation based on datasheets and established embedded development practices.
+> 
+> **Use at your own discretion** - While the code follows industry best practices and is based on proven techniques, real-world testing may reveal issues that require adjustment.
+> 
+> **Pull Requests Welcome!** - If you have the hardware and test this project, please contribute fixes, improvements, or validation reports. Community testing and contributions are highly valued!
+
 A C++ project for Raspberry Pi Pico W that brings an animatronic Dalek to life with Bluetooth gamepad control, differential drive movement, servo-controlled eye stalk movement, and iconic audio playback.
 
 ## 🤖 Project Overview
@@ -427,6 +435,17 @@ screen /dev/ttyACM0 115200
 - **pico_stdlib**: Standard Pico functionality
 
 ## 🤝 Contributing
+
+**Hardware Testing Needed!** This project is currently awaiting hardware validation. If you build and test this system, your feedback is invaluable!
+
+### Priority Contributions
+
+1. **Hardware Testing Reports**: Document what works, what doesn't, and any required modifications
+2. **Bug Fixes**: Issues discovered during real-world testing
+3. **Performance Optimizations**: Improvements based on actual hardware behavior
+4. **Documentation Updates**: Corrections or additions based on practical experience
+
+### Standard Contribution Process
 
 1. **Fork the repository**
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
