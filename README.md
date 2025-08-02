@@ -4,6 +4,8 @@
 > 
 > This project is currently **untested on physical hardware** as the author is awaiting component delivery. The codebase has been developed with significant assistance from **GitHub Copilot (Claude Sonnet 3.5)** and represents a theoretical implementation based on datasheets and established embedded development practices.
 > 
+> **Key Dependencies**: Built upon [BluePad32](https://github.com/ricardoquesada/bluepad32) for Bluetooth gamepad support and [rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) for PIO-based I2S audio implementation.
+> 
 > **Use at your own discretion** - While the code follows industry best practices and is based on proven techniques, real-world testing may reveal issues that require adjustment.
 > 
 > **Pull Requests Welcome!** - If you have the hardware and test this project, please contribute fixes, improvements, or validation reports. Community testing and contributions are highly valued!
@@ -248,6 +250,7 @@ The project follows **SOLID principles** and modern C++ best practices:
 - **Purpose**: Hardware abstraction for PIO-based I2S audio output
 - **Features**: Custom PIO state machines, DMA double-buffering, configurable sample rates, RAII design
 - **Interface**: `configure()`, `start()`, `stop()`, `writeAudio()`, interrupt handling
+- **Based on**: [malacalypse/rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) PIO implementation
 
 #### `exterminate_platform`
 
@@ -423,7 +426,7 @@ screen /dev/ttyACM0 115200
 ### Core Libraries
 
 - **Pico SDK v2.1.1**: Raspberry Pi Pico development framework
-- **BluePad32**: Bluetooth gamepad support library
+- **BluePad32**: Bluetooth gamepad support library ([GitHub](https://github.com/ricardoquesada/bluepad32))
 - **BTstack**: Bluetooth protocol stack
 - **CYW43**: WiFi/Bluetooth driver for Pico W
 
@@ -433,6 +436,11 @@ screen /dev/ttyACM0 115200
 - **hardware_i2s**: I2S audio output with MAX98357A amplifier
 - **hardware_gpio**: GPIO pin control and configuration
 - **pico_stdlib**: Standard Pico functionality
+
+### Key Inspirations and References
+
+- **I2S Implementation**: Based on [malacalypse/rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) - Excellent reference for PIO-based I2S audio output
+- **BluePad32 Integration**: Comprehensive Bluetooth gamepad library by Ricardo Quesada
 
 ## 🤝 Contributing
 
