@@ -1,0 +1,48 @@
+name: Build Exterminate Firmware
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Pico SDK and Toolchain
+      uses: Fortinbra/RaspberryPiPicoBuild@v7
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DPICO_SDK_PATH=${{github.workspace}}/pico-sdk
+    
+    - name: Build firmware
+      run: |
+        cd build
+        make -j$(nproc)
+    
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: exterminate-firmware
+        path: |
+          build/Exterminate.uf2
+          build/Exterminate.elf
+          build/Exterminate.bin
+        retention-days: 30
+    
+    - name: Verify build artifacts
+      run: |
+        ls -la build/Exterminate.*
+        echo "Build completed successfully!"
+        echo "Total firmware size:"
+        ls -lh build/Exterminate.uf2

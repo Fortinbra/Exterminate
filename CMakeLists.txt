@@ -40,13 +40,21 @@ set(BLUEPAD32_ROOT ${CMAKE_CURRENT_LIST_DIR}/lib/bluepad32)
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(Exterminate src/main.cpp src/exterminate_platform.cpp src/MotorController.cpp )
+add_executable(Exterminate 
+    src/main.cpp 
+    src/exterminate_platform.cpp 
+    src/MotorController.cpp 
+    src/AudioController.cpp
+    src/I2S.cpp
+    src/LEDController.cpp
+)
 
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
 
-# Generate PIO header
+# Generate PIO headers
 pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
+pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/src/i2s.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(Exterminate 0)
@@ -60,6 +68,7 @@ target_link_libraries(Exterminate
 target_include_directories(Exterminate PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/include/audio
         ${CMAKE_CURRENT_LIST_DIR}/src
         ${BLUEPAD32_ROOT}/src/components/bluepad32/include
 )
@@ -73,6 +82,7 @@ include_directories(${PICO_SDK_PATH}/lib/btstack/src)
 target_link_libraries(Exterminate 
         hardware_pio
         hardware_pwm
+        hardware_dma
         pico_cyw43_arch_none
         pico_btstack_classic
         pico_btstack_cyw43
