@@ -53,12 +53,11 @@ pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
 
 # Generate PIO headers
-pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
 pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/src/i2s.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(Exterminate 0)
-pico_enable_stdio_usb(Exterminate 1)
+pico_enable_stdio_uart(Exterminate 1)
+pico_enable_stdio_usb(Exterminate 0)
 
 # Add the standard library to the build
 target_link_libraries(Exterminate
