@@ -44,16 +44,19 @@ add_executable(Exterminate
     src/main.cpp 
     src/exterminate_platform.cpp 
     src/MotorController.cpp 
-    src/AudioController.cpp
-    src/I2S.cpp
+    # TEMPORARILY DISABLED FOR LED TESTING
+    # src/AudioController.cpp
+    # src/I2S.cpp
     src/LEDController.cpp
+    # src/AudioData.cpp
+    # src/AudioIndex.cpp
 )
 
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
 
-# Generate PIO headers
-pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/src/i2s.pio)
+# Generate PIO headers (TEMPORARILY DISABLED FOR LED TESTING)
+# pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/src/i2s.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(Exterminate 1)
@@ -79,9 +82,10 @@ include_directories(${PICO_SDK_PATH}/lib/btstack/src)
 
 # Add any user requested libraries
 target_link_libraries(Exterminate 
-        hardware_pio
+        # TEMPORARILY DISABLED FOR LED TESTING
+        # hardware_pio
         hardware_pwm
-        hardware_dma
+        # hardware_dma
         pico_cyw43_arch_none
         pico_btstack_classic
         pico_btstack_cyw43

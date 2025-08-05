@@ -11,6 +11,15 @@
 #include "sdkconfig.h"
 #include "MotorController.h"
 
+// Forward declaration to avoid including audio headers here
+namespace Exterminate {
+    class AudioController;
+}
+
+// Function to create and initialize audio controller (defined at end of file)
+Exterminate::AudioController* createAndInitializeAudioController();
+bool playStartupAudio(Exterminate::AudioController* controller);
+
 // Sanity check
 #ifndef CONFIG_BLUEPAD32_PLATFORM_CUSTOM
 #error "Pico W must use BLUEPAD32_PLATFORM_CUSTOM"
@@ -18,6 +27,9 @@
 
 // Motor controller instance
 static Exterminate::MotorController* motorController = nullptr;
+
+// Audio controller instance
+static Exterminate::AudioController* audioController = nullptr;
 
 // Controller status LED configuration
 #define CONTROLLER_STATUS_LED_PIN 15
@@ -62,6 +74,18 @@ static void exterminate_platform_init(int argc, const char** argv) {
         delete motorController;
         motorController = nullptr;
     }
+    
+    // Initialize audio controller (now that header issues are fixed)
+    // TEMPORARILY DISABLED TO TEST LED FUNCTIONALITY
+    // audioController = createAndInitializeAudioController();
+    
+    // if (audioController) {
+    //     logi("Exterminate platform: Audio controller initialized successfully\n");
+    // } else {
+    //     loge("Exterminate platform: Failed to initialize audio controller\n");
+    // }
+    
+    logi("Exterminate platform: Audio controller DISABLED for LED testing\n");
 }
 
 static void exterminate_platform_on_init_complete(void) {
@@ -74,7 +98,33 @@ static void exterminate_platform_on_init_complete(void) {
     controller_connected = false;
     last_flash_time = get_absolute_time();
     flash_state = false;
-    logi("Controller status LED: FLASHING (waiting for controller)\n");
+    logi("Controller status LED: Starting FLASHING mode (waiting for controller)\n");
+    
+    // Test LED functionality
+    logi("Controller status LED: Testing LED on GPIO %d\n", CONTROLLER_STATUS_LED_PIN);
+    gpio_put(CONTROLLER_STATUS_LED_PIN, 1);
+    busy_wait_ms(200);
+    gpio_put(CONTROLLER_STATUS_LED_PIN, 0);
+    busy_wait_ms(200);
+    gpio_put(CONTROLLER_STATUS_LED_PIN, 1);
+    busy_wait_ms(200);
+    gpio_put(CONTROLLER_STATUS_LED_PIN, 0);
+    logi("Controller status LED: Test sequence completed\n");
+    
+    // Play the first audio file to confirm successful boot and ready for pairing
+    // TEMPORARILY DISABLED TO TEST LED FUNCTIONALITY  
+    // if (audioController) {
+    //     logi("Audio controller available - attempting to play startup audio (AUDIO_00001)\n");
+    //     if (playStartupAudio(audioController)) {
+    //         logi("Startup audio playback initiated successfully\n");
+    //     } else {
+    //         loge("Failed to start startup audio playback\n");
+    //     }
+    // } else {
+    //     loge("Audio controller is NULL - cannot play startup audio\n");
+    // }
+    
+    logi("Audio system DISABLED for LED testing - initialization complete\n");
 }
 
 static void exterminate_platform_on_device_connected(uni_hid_device_t* d) {
@@ -243,9 +293,15 @@ static void init_controller_status_led(void) {
 }
 
 static void update_controller_status_led(void) {
+    static bool debug_printed = false;
+    
     if (controller_connected) {
         // Controller is connected - keep LED solid on
         gpio_put(CONTROLLER_STATUS_LED_PIN, 1);
+        if (!debug_printed) {
+            logi("LED Status: Controller connected, LED solid ON\n");
+            debug_printed = true;
+        }
     } else {
         // No controller connected - flash LED
         absolute_time_t current_time = get_absolute_time();
@@ -255,6 +311,11 @@ static void update_controller_status_led(void) {
             flash_state = !flash_state;
             gpio_put(CONTROLLER_STATUS_LED_PIN, flash_state ? 1 : 0);
             last_flash_time = current_time;
+            
+            if (!debug_printed) {
+                logi("LED Status: No controller, flashing - state: %s\n", flash_state ? "ON" : "OFF");
+                debug_printed = true;
+            }
         }
     }
 }
@@ -263,4 +324,64 @@ extern "C" {
 struct uni_platform* get_exterminate_platform(void) {
     return (struct uni_platform*)&exterminate_platform;
 }
+}
+
+// Audio controller implementation - include headers here to avoid conflicts
+#include "AudioController.h"
+#include "audio/audio_index.h"
+
+Exterminate::AudioController* createAndInitializeAudioController() {
+    logi("Creating audio controller with configuration:\n");
+    
+    // Configure I2S audio system
+    Exterminate::AudioController::Config audioConfig = {
+        .dataOutPin = 6,           // I2S data output (GPIO 6)
+        .clockPinBase = 8,         // I2S clock base (GPIO 8 for BCK, GPIO 9 for LRCK)  
+        .systemClockPin = 10,      // System clock output (GPIO 10)
+        .sampleRate = 44100,       // 44.1kHz audio (matches our embedded audio)
+        .enableSystemClock = true  // Enable system clock generation
+    };
+    
+    logi("  dataOutPin: %d\n", audioConfig.dataOutPin);
+    logi("  clockPinBase: %d\n", audioConfig.clockPinBase);
+    logi("  systemClockPin: %d\n", audioConfig.systemClockPin);
+    logi("  sampleRate: %d\n", audioConfig.sampleRate);
+    logi("  enableSystemClock: %s\n", audioConfig.enableSystemClock ? "true" : "false");
+    
+    auto* controller = new Exterminate::AudioController(audioConfig);
+    if (controller) {
+        logi("AudioController object created successfully\n");
+        if (controller->initialize()) {
+            logi("AudioController initialized successfully\n");
+            return controller;
+        } else {
+            loge("AudioController initialization failed\n");
+            delete controller;
+            return nullptr;
+        }
+    } else {
+        loge("Failed to create AudioController object\n");
+        return nullptr;
+    }
+}
+
+bool playStartupAudio(Exterminate::AudioController* controller) {
+    if (!controller) {
+        loge("playStartupAudio: controller is NULL\n");
+        return false;
+    }
+    
+    logi("playStartupAudio: Attempting to play AUDIO_00001\n");
+    
+    // Play the first audio file (00001.mp3 -> AUDIO_00001)
+    // This should be a short boot-up sound to confirm the device is ready
+    bool result = controller->playAudio(Exterminate::Audio::AudioIndex::AUDIO_00001);
+    
+    if (result) {
+        logi("playStartupAudio: Audio playback started successfully\n");
+    } else {
+        loge("playStartupAudio: Audio playback failed to start\n");
+    }
+    
+    return result;
 }

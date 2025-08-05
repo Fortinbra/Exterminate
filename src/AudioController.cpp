@@ -4,6 +4,7 @@
 #include <memory>
 #include <cstdint>
 #include <functional>
+#include <uni.h>  // For logi/loge functions
 
 namespace Exterminate {
 
@@ -27,27 +28,60 @@ AudioController::~AudioController()
 
 bool AudioController::initialize()
 {
+    logi("AudioController::initialize() - Starting initialization\n");
+    
     if (i2sController_) {
+        logi("AudioController::initialize() - Already initialized\n");
         return true;  // Already initialized
     }
 
     try {
+        logi("AudioController::initialize() - Creating I2S configuration\n");
+        
         // Create I2S configuration
         I2SConfig i2sConfig;
         i2sConfig.dataOutPin = config_.dataOutPin;
+        i2sConfig.dataInPin = 7;           // GPIO 7 for input (unused but required)
         i2sConfig.clockPinBase = config_.clockPinBase;
         i2sConfig.systemClockPin = config_.systemClockPin;
         i2sConfig.sampleRate = config_.sampleRate;
+        i2sConfig.systemClockMult = 256;   // Standard multiplier
+        i2sConfig.bitDepth = 16;           // 16-bit audio
         i2sConfig.enableSystemClock = config_.enableSystemClock;
         
+        logi("AudioController::initialize() - I2S Config: dataOut=%d, dataIn=%d, clockBase=%d, sysClock=%d, rate=%d, bitDepth=%d\n",
+             i2sConfig.dataOutPin, i2sConfig.dataInPin, i2sConfig.clockPinBase, 
+             i2sConfig.systemClockPin, i2sConfig.sampleRate, i2sConfig.bitDepth);
+        
         // Create I2S controller with our audio processor
+        logi("AudioController::initialize() - Creating I2S controller\n");
         i2sController_ = std::make_unique<I2SController>(i2sConfig, 
             std::make_unique<PCMAudioProcessor>(this));
         
+        if (!i2sController_) {
+            loge("AudioController::initialize() - Failed to create I2S controller\n");
+            return false;
+        }
+        
+        logi("AudioController::initialize() - I2S controller created, initializing hardware\n");
+        
         // Initialize I2S hardware
-        return i2sController_->initialize();
+        bool result = i2sController_->initialize();
+        
+        if (result) {
+            logi("AudioController::initialize() - I2S hardware initialization successful\n");
+        } else {
+            loge("AudioController::initialize() - I2S hardware initialization failed\n");
+        }
+        
+        return result;
+    }
+    catch (const std::exception& e) {
+        loge("AudioController::initialize() - Exception during initialization: %s\n", e.what());
+        return false;
     }
     catch (...) {
+        loge("AudioController::initialize() - Unknown exception during initialization\n");
         return false;
     }
 }
