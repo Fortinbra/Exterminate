@@ -17,7 +17,7 @@
 #include "pico/stdlib.h"
 #include <cmath>
 #include <cstring>
-#include <uni.h>  // For logi/loge functions
+#include <stdio.h>  // For printf functions
 
 namespace Exterminate {
 
@@ -224,48 +224,48 @@ I2SController::~I2SController() {
 }
 
 bool I2SController::initialize() {
-    logi("I2SController::initialize() - Starting I2S initialization\n");
+    printf("I2SController::initialize() - Starting I2S initialization\n");
     
     // Calculate clocks
-    logi("I2SController::initialize() - Calculating clocks\n");
+    printf("I2SController::initialize() - Calculating clocks\n");
     if (!clocks.calculateClocks(config)) {
-        loge("I2SController::initialize() - Clock calculation failed\n");
+        printf("ERROR: I2SController::initialize() - Clock calculation failed\n");
         return false;
     }
-    logi("I2SController::initialize() - Clock calculation successful\n");
+    printf("I2SController::initialize() - Clock calculation successful\n");
     
     // Validate clock synchronization if system clock is enabled
     if (config.enableSystemClock) {
-        logi("I2SController::initialize() - Validating clock synchronization\n");
+        printf("I2SController::initialize() - Validating clock synchronization\n");
         if (!clocks.validateClockSync()) {
-            loge("I2SController::initialize() - Clock synchronization validation failed\n");
+            printf("ERROR: I2SController::initialize() - Clock synchronization validation failed\n");
             return false;
         }
-        logi("I2SController::initialize() - Clock synchronization validated\n");
+        printf("I2SController::initialize() - Clock synchronization validated\n");
     }
     
     // Initialize PIO and state machines
-    logi("I2SController::initialize() - Initializing PIO\n");
+    printf("I2SController::initialize() - Initializing PIO\n");
     if (!initializePIO()) {
-        loge("I2SController::initialize() - PIO initialization failed\n");
+        printf("ERROR: I2SController::initialize() - PIO initialization failed\n");
         return false;
     }
     
-    logi("I2SController::initialize() - Initializing state machines\n");
+    printf("I2SController::initialize() - Initializing state machines\n");
     if (!initializeStateMachines()) {
-        loge("I2SController::initialize() - State machine initialization failed\n");
+        printf("ERROR: I2SController::initialize() - State machine initialization failed\n");
         return false;
     }
     
     // Initialize DMA
-    logi("I2SController::initialize() - Initializing DMA\n");
+    printf("I2SController::initialize() - Initializing DMA\n");
     auto dmaHandler = [this]() { dmaInterruptHandler(); };
     if (!dmaController.initialize(pio, outputSM, inputSM, buffers, dmaHandler)) {
-        loge("I2SController::initialize() - DMA initialization failed\n");
+        printf("ERROR: I2SController::initialize() - DMA initialization failed\n");
         return false;
     }
     
-    logi("I2SController::initialize() - I2S initialization completed successfully\n");
+    printf("I2SController::initialize() - I2S initialization completed successfully\n");
     return true;
 }
 
@@ -278,11 +278,11 @@ bool I2SController::initializePIO() {
 bool I2SController::initializeStateMachines() {
     uint offset = 0;
     
-    logi("I2SController::initializeStateMachines() - Starting state machine setup\n");
+    printf("I2SController::initializeStateMachines() - Starting state machine setup\n");
     
     // Initialize system clock state machine if enabled
     if (config.enableSystemClock) {
-        logi("I2SController::initializeStateMachines() - Setting up system clock SM on pin %d\n", config.systemClockPin);
+        printf("I2SController::initializeStateMachines() - Setting up system clock SM on pin %d\n", config.systemClockPin);
         systemClockSM = pio_claim_unused_sm(pio, true);
         stateMachineMask |= (1u << systemClockSM);
         
@@ -291,11 +291,11 @@ bool I2SController::initializeStateMachines() {
         pio_sm_set_clkdiv_int_frac(pio, systemClockSM, 
                                   clocks.getSystemClockDivider(),
                                   clocks.getSystemClockFraction());
-        logi("I2SController::initializeStateMachines() - System clock SM %d configured\n", systemClockSM);
+        printf("I2SController::initializeStateMachines() - System clock SM %d configured\n", systemClockSM);
     }
     
     // Initialize input state machine
-    logi("I2SController::initializeStateMachines() - Setting up input SM on pin %d\n", config.dataInPin);
+    printf("I2SController::initializeStateMachines() - Setting up input SM on pin %d\n", config.dataInPin);
     inputSM = pio_claim_unused_sm(pio, true);
     stateMachineMask |= (1u << inputSM);
     
@@ -304,10 +304,10 @@ bool I2SController::initializeStateMachines() {
     pio_sm_set_clkdiv_int_frac(pio, inputSM,
                               clocks.getBitClockDivider(),
                               clocks.getBitClockFraction());
-    logi("I2SController::initializeStateMachines() - Input SM %d configured\n", inputSM);
+    printf("I2SController::initializeStateMachines() - Input SM %d configured\n", inputSM);
     
     // Initialize output state machine  
-    logi("I2SController::initializeStateMachines() - Setting up output SM on pins %d,%d\n", config.dataOutPin, config.clockPinBase);
+    printf("I2SController::initializeStateMachines() - Setting up output SM on pins %d,%d\n", config.dataOutPin, config.clockPinBase);
     outputSM = pio_claim_unused_sm(pio, true);
     stateMachineMask |= (1u << outputSM);
     
@@ -317,9 +317,9 @@ bool I2SController::initializeStateMachines() {
     pio_sm_set_clkdiv_int_frac(pio, outputSM,
                               clocks.getBitClockDivider(),
                               clocks.getBitClockFraction());
-    logi("I2SController::initializeStateMachines() - Output SM %d configured\n", outputSM);
+    printf("I2SController::initializeStateMachines() - Output SM %d configured\n", outputSM);
     
-    logi("I2SController::initializeStateMachines() - All state machines configured successfully\n");
+    printf("I2SController::initializeStateMachines() - All state machines configured successfully\n");
     return true;
 }
 

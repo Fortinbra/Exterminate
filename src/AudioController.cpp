@@ -4,7 +4,7 @@
 #include <memory>
 #include <cstdint>
 #include <functional>
-#include <uni.h>  // For logi/loge functions
+#include <stdio.h>  // For printf functions
 
 namespace Exterminate {
 
@@ -13,6 +13,8 @@ AudioController::AudioController(const Config& config)
     , playbackState_(PlaybackState::Stopped)
     , volume_(1.0f)
     , currentPCMData_(nullptr)
+    , currentPCMData32_(nullptr)
+    , using32BitData_(false)
     , currentSampleCount_(0)
     , currentSamplePosition_(0)
     , currentAudioIntensity_(0.0f)
@@ -28,15 +30,15 @@ AudioController::~AudioController()
 
 bool AudioController::initialize()
 {
-    logi("AudioController::initialize() - Starting initialization\n");
+    printf("AudioController::initialize() - Starting initialization\n");
     
     if (i2sController_) {
-        logi("AudioController::initialize() - Already initialized\n");
+        printf("AudioController::initialize() - Already initialized\n");
         return true;  // Already initialized
     }
 
     try {
-        logi("AudioController::initialize() - Creating I2S configuration\n");
+        printf("AudioController::initialize() - Creating I2S configuration\n");
         
         // Create I2S configuration
         I2SConfig i2sConfig;
@@ -46,42 +48,42 @@ bool AudioController::initialize()
         i2sConfig.systemClockPin = config_.systemClockPin;
         i2sConfig.sampleRate = config_.sampleRate;
         i2sConfig.systemClockMult = 256;   // Standard multiplier
-        i2sConfig.bitDepth = 16;           // 16-bit audio
+        i2sConfig.bitDepth = 32;           // 32-bit audio for MAX98357A compatibility
         i2sConfig.enableSystemClock = config_.enableSystemClock;
         
-        logi("AudioController::initialize() - I2S Config: dataOut=%d, dataIn=%d, clockBase=%d, sysClock=%d, rate=%d, bitDepth=%d\n",
+        printf("AudioController::initialize() - I2S Config: dataOut=%d, dataIn=%d, clockBase=%d, sysClock=%d, rate=%d, bitDepth=%d\n",
              i2sConfig.dataOutPin, i2sConfig.dataInPin, i2sConfig.clockPinBase, 
              i2sConfig.systemClockPin, i2sConfig.sampleRate, i2sConfig.bitDepth);
         
         // Create I2S controller with our audio processor
-        logi("AudioController::initialize() - Creating I2S controller\n");
+        printf("AudioController::initialize() - Creating I2S controller\n");
         i2sController_ = std::make_unique<I2SController>(i2sConfig, 
             std::make_unique<PCMAudioProcessor>(this));
         
         if (!i2sController_) {
-            loge("AudioController::initialize() - Failed to create I2S controller\n");
+            printf("ERROR: AudioController::initialize() - Failed to create I2S controller\n");
             return false;
         }
         
-        logi("AudioController::initialize() - I2S controller created, initializing hardware\n");
+        printf("AudioController::initialize() - I2S controller created, initializing hardware\n");
         
         // Initialize I2S hardware
         bool result = i2sController_->initialize();
         
         if (result) {
-            logi("AudioController::initialize() - I2S hardware initialization successful\n");
+            printf("AudioController::initialize() - I2S hardware initialization successful\n");
         } else {
-            loge("AudioController::initialize() - I2S hardware initialization failed\n");
+            printf("ERROR: AudioController::initialize() - I2S hardware initialization failed\n");
         }
         
         return result;
     }
     catch (const std::exception& e) {
-        loge("AudioController::initialize() - Exception during initialization: %s\n", e.what());
+        printf("ERROR: AudioController::initialize() - Exception during initialization: %s\n", e.what());
         return false;
     }
     catch (...) {
-        loge("AudioController::initialize() - Unknown exception during initialization\n");
+        printf("ERROR: AudioController::initialize() - Unknown exception during initialization\n");
         return false;
     }
 }
@@ -111,8 +113,33 @@ bool AudioController::playPCMAudioData(const int16_t* data, size_t sampleCount)
     // Stop current playback if any
     stopAudio();
 
-    // Set up new PCM playback
+    // Set up new PCM playback (16-bit)
     currentPCMData_ = data;
+    currentPCMData32_ = nullptr;
+    using32BitData_ = false;
+    currentSampleCount_ = sampleCount;
+    currentSamplePosition_ = 0;
+    playbackState_ = PlaybackState::Playing;
+
+    // Start I2S output
+    i2sController_->start();
+    
+    return true;
+}
+
+bool AudioController::playPCMAudioData(const int32_t* data, size_t sampleCount)
+{
+    if (!i2sController_ || !data || sampleCount == 0) {
+        return false;
+    }
+
+    // Stop current playback if any
+    stopAudio();
+
+    // Set up new PCM playback (32-bit)
+    currentPCMData_ = nullptr;
+    currentPCMData32_ = data;
+    using32BitData_ = true;
     currentSampleCount_ = sampleCount;
     currentSamplePosition_ = 0;
     playbackState_ = PlaybackState::Playing;
@@ -195,21 +222,29 @@ void AudioController::PCMAudioProcessor::processAudio(const int32_t* input, int3
     }
 
     const int16_t* pcmData = controller_->currentPCMData_;
+    const int32_t* pcmData32 = controller_->currentPCMData32_;
+    bool using32Bit = controller_->using32BitData_;
     size_t& position = controller_->currentSamplePosition_;
     size_t sampleCount = controller_->currentSampleCount_;
     
     for (size_t frame = 0; frame < frameCount; ++frame) {
-        int16_t sample = 0;
+        int32_t sample32 = 0;
         
-        if (position < sampleCount && pcmData) {
-            sample = pcmData[position++];
-            
-            // Apply volume if needed
-            sample = controller_->applyVolume(sample);
+        if (position < sampleCount) {
+            if (using32Bit && pcmData32) {
+                // Use 32-bit data directly
+                sample32 = pcmData32[position++];
+            } else if (!using32Bit && pcmData) {
+                // Convert 16-bit to 32-bit
+                int16_t sample16 = pcmData[position++];
+                sample16 = controller_->applyVolume(sample16);
+                sample32 = static_cast<int32_t>(sample16) << 16;
+            }
         }
         
         // Convert 16-bit PCM to 32-bit I2S format (left and right channels)
-        int32_t sample32 = static_cast<int32_t>(sample) << 16;
+        // MAX98357A expects data in upper 16 bits, shifted left by 16
+        // with proper sign extension for negative values
         output[frame * 2] = sample32;      // Left channel
         output[frame * 2 + 1] = sample32;  // Right channel (mono to stereo)
         

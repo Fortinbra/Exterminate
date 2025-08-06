@@ -43,8 +43,8 @@ public:
                 .dataOutPin = 6,
                 .clockPinBase = 8,      // Uses pins 8 (BCK) and 9 (LRCK)
                 .systemClockPin = 10,
-                .sampleRate = 22050,    // Match our PCM audio files
-                .enableSystemClock = true
+                .sampleRate = 44100,    // Match our PCM audio files
+                .enableSystemClock = false  // Disabled by default for most I2S DACs
             };
         }
     };
@@ -83,7 +83,7 @@ public:
     bool playAudio(Audio::AudioIndex audioIndex);
 
     /**
-     * @brief Play PCM audio data directly
+     * @brief Play PCM audio data directly (16-bit)
      * 
      * @param data Pointer to 16-bit PCM sample data
      * @param sampleCount Number of samples to play
@@ -91,6 +91,16 @@ public:
      * @return false if playback failed to start
      */
     bool playPCMAudioData(const int16_t* data, size_t sampleCount);
+
+    /**
+     * @brief Play PCM audio data directly (32-bit)
+     * 
+     * @param data Pointer to 32-bit PCM sample data
+     * @param sampleCount Number of samples to play
+     * @return true if playback started successfully
+     * @return false if playback failed to start
+     */
+    bool playPCMAudioData(const int32_t* data, size_t sampleCount);
 
     /**
      * @brief Stop audio playback
@@ -182,6 +192,8 @@ private:
     
     // Current playback state
     const int16_t* currentPCMData_;
+    const int32_t* currentPCMData32_;  // For 32-bit audio data
+    bool using32BitData_;              // Flag to track which data type is being used
     size_t currentSampleCount_;
     size_t currentSamplePosition_;
     
