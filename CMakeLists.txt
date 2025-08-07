@@ -54,8 +54,8 @@ pico_enable_stdio_usb(Exterminate 0)
 # Add the standard library to the build
 target_link_libraries(Exterminate
         pico_stdlib
-        pico_audio
         pico_audio_i2s
+        pico_multicore
         hardware_gpio)
 
 # Add the standard include files to the build

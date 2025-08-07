@@ -331,28 +331,30 @@ struct uni_platform* get_exterminate_platform(void) {
 #include "audio/audio_index.h"
 
 Exterminate::AudioController* createAndInitializeAudioController() {
-    logi("Creating audio controller with configuration:\n");
+    logi("Creating audio controller with NEW Pico Extras I2S implementation:\n");
     
-    // Configure I2S audio system
+    // Configure I2S audio system with updated pin layout
+    // Based on hardware configuration docs: GPIO 6=BCK, GPIO 7=LRCLK, GPIO 9=DOUT  
     Exterminate::AudioController::Config audioConfig = {
-        .dataOutPin = 6,           // I2S data output (GPIO 6)
-        .clockPinBase = 8,         // I2S clock base (GPIO 8 for BCK, GPIO 9 for LRCK)  
-        .systemClockPin = 10,      // System clock output (GPIO 10)
+        .dataPin = 9,              // I2S data output (DOUT) - GPIO 9
+        .clockPinBase = 6,         // I2S clock base (GPIO 6=BCK, GPIO 7=LRCLK)
         .sampleRate = 44100,       // 44.1kHz audio (matches our embedded audio)
-        .enableSystemClock = true  // Enable system clock generation
+        .bufferCount = 3,          // Triple buffering
+        .samplesPerBuffer = 256    // Small buffers for low latency
     };
     
-    logi("  dataOutPin: %d\n", audioConfig.dataOutPin);
-    logi("  clockPinBase: %d\n", audioConfig.clockPinBase);
-    logi("  systemClockPin: %d\n", audioConfig.systemClockPin);
-    logi("  sampleRate: %d\n", audioConfig.sampleRate);
-    logi("  enableSystemClock: %s\n", audioConfig.enableSystemClock ? "true" : "false");
+    logi("  dataPin: %u (I2S DOUT)\n", audioConfig.dataPin);
+    logi("  clockPinBase: %u (BCK=%u, LRCLK=%u)\n", 
+         audioConfig.clockPinBase, audioConfig.clockPinBase, audioConfig.clockPinBase + 1);
+    logi("  sampleRate: %u Hz\n", audioConfig.sampleRate);
+    logi("  bufferCount: %u\n", audioConfig.bufferCount);
+    logi("  samplesPerBuffer: %u\n", audioConfig.samplesPerBuffer);
     
     auto* controller = new Exterminate::AudioController(audioConfig);
     if (controller) {
         logi("AudioController object created successfully\n");
         if (controller->initialize()) {
-            logi("AudioController initialized successfully\n");
+            logi("AudioController initialized successfully with Pico Extras I2S\n");
             return controller;
         } else {
             loge("AudioController initialization failed\n");

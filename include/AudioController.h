@@ -1,21 +1,20 @@
 #pragma once
 
-#include "I2S.h"
 #include "audio/audio_index.h"
+#include "pico/audio_i2s.h"
+#include "pico/multicore.h"
 #include <cstdint>
 #include <memory>
-#include <functional>
+#include <atomic>
 
 namespace Exterminate {
 
 /**
- * @brief Controller for I2S audio playback with embedded PCM support
+ * @brief Clean I2S Audio Controller using Pico Extras audio_i2s
  * 
- * This class provides control for I2S audio output and manages
- * embedded audio resources converted from audio files to PCM format.
- * Supports direct playback without requiring real-time decoding.
- * 
- * Integrates with the modern I2S PIO implementation for reliable audio output.
+ * Simplified implementation focused on reliable I2S audio output
+ * using the proven Pico Extras library. Supports embedded PCM audio
+ * with real-time streaming and LED visualization integration.
  */
 class AudioController {
 public:
@@ -29,209 +28,167 @@ public:
     };
 
     /**
-     * @brief Configuration structure for audio controller
+     * @brief I2S Configuration structure
      */
     struct Config {
-        uint8_t dataOutPin;     ///< I2S data output pin (to DAC)
-        uint8_t clockPinBase;   ///< Base pin for BCK and LRCK (consecutive pins)
-        uint8_t systemClockPin; ///< System clock output pin (optional)
-        uint32_t sampleRate;    ///< Sample rate in Hz (default: 22050 to match PCM files)
-        bool enableSystemClock; ///< Whether to generate system clock output
+        uint8_t dataPin;        ///< I2S data output pin (DOUT)
+        uint8_t clockPinBase;   ///< Base pin for clocks (BCK = base, LRCLK = base+1)
+        uint32_t sampleRate;    ///< Audio sample rate (Hz)
+        uint bufferCount;       ///< Number of audio buffers to use
+        uint samplesPerBuffer;  ///< Samples per audio buffer
         
-        static Config getDefaultConfig() {
+        static Config getDefault() {
             return Config{
-                .dataOutPin = 6,
-                .clockPinBase = 8,      // Uses pins 8 (BCK) and 9 (LRCK)
-                .systemClockPin = 10,
-                .sampleRate = 44100,    // Match our PCM audio files
-                .enableSystemClock = false  // Disabled by default for most I2S DACs
+                .dataPin = 9,          // GPIO 9 = I2S DOUT
+                .clockPinBase = 6,     // GPIO 6 = BCK, GPIO 7 = LRCLK (per documentation)
+                .sampleRate = 22050,   // Match our embedded audio files (they are 22.05kHz)
+                .bufferCount = 3,      // Triple buffering for smooth playback
+                .samplesPerBuffer = 256 // Small buffers for low latency
             };
         }
     };
 
     /**
-     * @brief Construct a new Audio Controller
+     * @brief Construct Audio Controller
      * 
-     * @param config Configuration for the audio controller
+     * @param config I2S configuration
      */
-    explicit AudioController(const Config& config = Config::getDefaultConfig());
+    explicit AudioController(const Config& config = Config::getDefault());
 
     /**
-     * @brief Destroy the Audio Controller (RAII cleanup)
+     * @brief Destroy Audio Controller
      */
     ~AudioController();
 
-    // Disable copy constructor and assignment operator
+    // Disable copy operations
     AudioController(const AudioController&) = delete;
     AudioController& operator=(const AudioController&) = delete;
 
     /**
-     * @brief Initialize the audio controller
+     * @brief Initialize I2S audio system
      * 
-     * @return true if initialization was successful
-     * @return false if initialization failed
+     * @return true if successful
      */
     bool initialize();
 
     /**
-     * @brief Play an embedded audio file by index
+     * @brief Shutdown audio system
+     */
+    void shutdown();
+
+    /**
+     * @brief Play embedded audio by index
      * 
-     * @param audioIndex Index from AudioIndex enum
-     * @return true if playback started successfully
-     * @return false if playback failed to start
+     * @param audioIndex Audio file to play
+     * @return true if playback started
      */
     bool playAudio(Audio::AudioIndex audioIndex);
 
     /**
-     * @brief Play PCM audio data directly (16-bit)
+     * @brief Stop current audio playback
      * 
-     * @param data Pointer to 16-bit PCM sample data
-     * @param sampleCount Number of samples to play
-     * @return true if playback started successfully
-     * @return false if playback failed to start
+     * @return true if stopped successfully
      */
-    bool playPCMAudioData(const int16_t* data, size_t sampleCount);
+    bool stopAudio();
 
     /**
-     * @brief Play PCM audio data directly (32-bit)
+     * @brief Pause current audio playback
      * 
-     * @param data Pointer to 32-bit PCM sample data
-     * @param sampleCount Number of samples to play
-     * @return true if playback started successfully
-     * @return false if playback failed to start
+     * @return true if paused successfully
      */
-    bool playPCMAudioData(const int32_t* data, size_t sampleCount);
-
-    /**
-     * @brief Stop audio playback
-     */
-    void stopAudio();
-
-    /**
-     * @brief Pause audio playback
-     */
-    void pauseAudio();
+    bool pauseAudio();
 
     /**
      * @brief Resume paused audio playback
-     */
-    void resumeAudio();
-
-    /**
-     * @brief Check if audio is currently playing
      * 
-     * @return true if audio is playing
-     * @return false if audio is stopped or paused
+     * @return true if resumed successfully
      */
-    bool isPlaying() const;
+    bool resumeAudio();
 
     /**
-     * @brief Set audio volume level
+     * @brief Set audio volume
      * 
      * @param volume Volume level (0.0 to 1.0)
      */
     void setVolume(float volume);
 
     /**
-     * @brief Get current audio volume level
+     * @brief Get current volume
      * 
      * @return float Current volume (0.0 to 1.0)
      */
-    float getVolume() const;
+    float getVolume() const { return volume_.load(); }
+
+    /**
+     * @brief Get current playback state
+     * 
+     * @return PlaybackState Current state
+     */
+    PlaybackState getPlaybackState() const { return playbackState_.load(); }
+
+    /**
+     * @brief Check if audio is playing
+     * 
+     * @return true if currently playing
+     */
+    bool isPlaying() const { return getPlaybackState() == PlaybackState::Playing; }
 
     /**
      * @brief Get current audio intensity for LED effects
      * 
-     * @return float Current audio intensity (0.0 = silent, 1.0 = max)
+     * @return float Normalized intensity (0.0 to 1.0)
      */
-    float getAudioIntensity() const;
-
-    /**
-     * @brief Set LED intensity callback for real-time audio visualization
-     * 
-     * @param callback Function to call with audio intensity updates
-     */
-    void setLEDIntensityCallback(std::function<void(float)> callback);
-
-    /**
-     * @brief Get total number of available audio files
-     * 
-     * @return size_t Number of audio files
-     */
-    static size_t getAudioFileCount();
-
-    /**
-     * @brief Get audio file information by index
-     * 
-     * @param audioIndex Audio file index
-     * @return const Audio::AudioFile* Pointer to audio file info, or nullptr if invalid
-     */
-    static const Audio::AudioFile* getAudioFileInfo(Audio::AudioIndex audioIndex);
+    float getAudioIntensity() const { return audioIntensity_.load(); }
 
 private:
-    /**
-     * @brief Audio processor implementation for PCM playback
-     */
-    class PCMAudioProcessor : public IAudioProcessor {
-    private:
-        AudioController* controller_;
-        
-    public:
-        explicit PCMAudioProcessor(AudioController* controller) 
-            : controller_(controller) {}
-        
-        void processAudio(const int32_t* input, int32_t* output, size_t frameCount) override;
-    };
-
     Config config_;
-    std::unique_ptr<I2SController> i2sController_;
-    std::unique_ptr<PCMAudioProcessor> audioProcessor_;
     
-    PlaybackState playbackState_;
-    float volume_;
+    // Thread-safe state variables
+    std::atomic<PlaybackState> playbackState_;
+    std::atomic<float> volume_;
+    std::atomic<float> audioIntensity_;
     
-    // Current playback state
-    const int16_t* currentPCMData_;
-    const int32_t* currentPCMData32_;  // For 32-bit audio data
-    bool using32BitData_;              // Flag to track which data type is being used
-    size_t currentSampleCount_;
-    size_t currentSamplePosition_;
+    // Pico Extras I2S components
+    audio_buffer_pool_t* bufferPool_;
+    audio_format_t audioFormat_;
+    audio_i2s_config_t i2sConfig_;
+    bool initialized_;
     
-    // LED integration
-    std::function<void(float)> ledIntensityCallback_;
-    float currentAudioIntensity_;
-
+    // Current audio data
+    const int16_t* currentAudioData_;
+    std::atomic<size_t> currentAudioSize_;
+    std::atomic<size_t> currentAudioPosition_;
+    
+    // Multicore synchronization
+    static AudioController* instance_;
+    
     /**
-     * @brief Apply volume scaling to audio sample
+     * @brief Audio callback function for buffer filling
      * 
-     * @param sample Input audio sample
-     * @return int16_t Volume-adjusted sample
+     * Called by the audio system when buffers need data
      */
-    int16_t applyVolume(int16_t sample) const;
-
+    static void audioCallback(void* userData);
+    
     /**
-     * @brief Calculate current audio intensity from PCM data
+     * @brief Fill audio buffer with current PCM data
      * 
-     * @param samples Pointer to current PCM samples
-     * @param count Number of samples to analyze
-     * @return float Audio intensity (0.0 to 1.0)
+     * @param buffer Buffer to fill
+     * @return Number of samples written
      */
-    float calculateAudioIntensity(const int16_t* samples, size_t count) const;
-
+    size_t fillAudioBuffer(audio_buffer_t* buffer);
+    
     /**
-     * @brief Update LED intensity based on current audio
-     */
-    void updateLEDIntensity();
-
-    /**
-     * @brief Constrain value within range
+     * @brief Calculate audio intensity for LED effects
      * 
-     * @param value Value to constrain
-     * @param min Minimum value
-     * @param max Maximum value
-     * @return float Constrained value
+     * @param samples PCM samples to analyze
+     * @param sampleCount Number of samples
      */
-    static float constrain(float value, float min, float max);
+    void updateAudioIntensity(const int16_t* samples, size_t sampleCount);
+    
+    /**
+     * @brief Start the audio worker on core 1
+     */
+    void startAudioWorker();
 };
 
 } // namespace Exterminate

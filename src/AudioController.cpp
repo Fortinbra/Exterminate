@@ -1,336 +1,330 @@
 #include "AudioController.h"
+#include "audio/audio_index.h"
+#include "pico/multicore.h"
 #include <algorithm>
 #include <cmath>
-#include <memory>
-#include <cstdint>
-#include <functional>
-#include <stdio.h>  // For printf functions
+#include <cstring>
+#include <stdio.h>
 
 namespace Exterminate {
+
+// Static instance for audio callbacks
+AudioController* AudioController::instance_ = nullptr;
 
 AudioController::AudioController(const Config& config)
     : config_(config)
     , playbackState_(PlaybackState::Stopped)
     , volume_(1.0f)
-    , currentPCMData_(nullptr)
-    , currentPCMData32_(nullptr)
-    , using32BitData_(false)
-    , currentSampleCount_(0)
-    , currentSamplePosition_(0)
-    , currentAudioIntensity_(0.0f)
+    , audioIntensity_(0.0f)
+    , bufferPool_(nullptr)
+    , initialized_(false)
+    , currentAudioData_(nullptr)
+    , currentAudioSize_(0)
+    , currentAudioPosition_(0)
 {
-    // Create audio processor
-    audioProcessor_ = std::make_unique<PCMAudioProcessor>(this);
+    printf("AudioController: Created with Pico Extras I2S - data_pin=%u, clock_base=%u, sample_rate=%u\n",
+           config_.dataPin, config_.clockPinBase, config_.sampleRate);
 }
 
-AudioController::~AudioController()
-{
-    stopAudio();
+AudioController::~AudioController() {
+    shutdown();
+    instance_ = nullptr;
+    printf("AudioController: Destroyed\n");
 }
 
-bool AudioController::initialize()
-{
-    printf("AudioController::initialize() - Starting initialization\n");
+bool AudioController::initialize() {
+    if (initialized_) {
+        printf("AudioController: Already initialized\n");
+        return true;
+    }
+
+    printf("AudioController: Initializing Pico Extras I2S audio system...\n");
     
-    if (i2sController_) {
-        printf("AudioController::initialize() - Already initialized\n");
-        return true;  // Already initialized
+    // Set static instance for callbacks
+    instance_ = this;
+
+    // Configure audio format for our embedded PCM data
+    // All our audio files are 22050Hz, mono, 16-bit
+    audioFormat_ = {
+        .sample_freq = config_.sampleRate,
+        .format = AUDIO_BUFFER_FORMAT_PCM_S16,
+        .channel_count = 1  // Mono
+    };
+
+    printf("AudioController: Audio format - %uHz, %u channels, 16-bit PCM\n", 
+           audioFormat_.sample_freq, audioFormat_.channel_count);
+
+    // Configure I2S pins
+    i2sConfig_ = {
+        .data_pin = config_.dataPin,
+        .clock_pin_base = config_.clockPinBase,
+        .dma_channel = 0,  // Let the library choose
+        .pio_sm = 0        // Let the library choose
+    };
+
+    printf("AudioController: I2S config - data_pin=%u, clock_base=%u\n",
+           i2sConfig_.data_pin, i2sConfig_.clock_pin_base);
+
+    // Create audio buffer pool - we need a producer pool that we can fill
+    audio_buffer_format_t bufferFormat = {
+        .format = &audioFormat_,
+        .sample_stride = 2  // 16-bit = 2 bytes per sample
+    };
+    
+    bufferPool_ = audio_new_producer_pool(&bufferFormat, config_.bufferCount, config_.samplesPerBuffer);
+    if (!bufferPool_) {
+        printf("AudioController: ERROR - Failed to create buffer pool\n");
+        return false;
     }
 
-    try {
-        printf("AudioController::initialize() - Creating I2S configuration\n");
-        
-        // Create I2S configuration
-        I2SConfig i2sConfig;
-        i2sConfig.dataOutPin = config_.dataOutPin;
-        i2sConfig.dataInPin = 7;           // GPIO 7 for input (unused but required)
-        i2sConfig.clockPinBase = config_.clockPinBase;
-        i2sConfig.systemClockPin = config_.systemClockPin;
-        i2sConfig.sampleRate = config_.sampleRate;
-        i2sConfig.systemClockMult = 256;   // Standard multiplier
-        i2sConfig.bitDepth = 32;           // 32-bit audio for MAX98357A compatibility
-        i2sConfig.enableSystemClock = config_.enableSystemClock;
-        
-        printf("AudioController::initialize() - I2S Config: dataOut=%d, dataIn=%d, clockBase=%d, sysClock=%d, rate=%d, bitDepth=%d\n",
-             i2sConfig.dataOutPin, i2sConfig.dataInPin, i2sConfig.clockPinBase, 
-             i2sConfig.systemClockPin, i2sConfig.sampleRate, i2sConfig.bitDepth);
-        
-        // Create I2S controller with our audio processor
-        printf("AudioController::initialize() - Creating I2S controller\n");
-        i2sController_ = std::make_unique<I2SController>(i2sConfig, 
-            std::make_unique<PCMAudioProcessor>(this));
-        
-        if (!i2sController_) {
-            printf("ERROR: AudioController::initialize() - Failed to create I2S controller\n");
-            return false;
-        }
-        
-        printf("AudioController::initialize() - I2S controller created, initializing hardware\n");
-        
-        // Initialize I2S hardware
-        bool result = i2sController_->initialize();
-        
-        if (result) {
-            printf("AudioController::initialize() - I2S hardware initialization successful\n");
-        } else {
-            printf("ERROR: AudioController::initialize() - I2S hardware initialization failed\n");
-        }
-        
-        return result;
-    }
-    catch (const std::exception& e) {
-        printf("ERROR: AudioController::initialize() - Exception during initialization: %s\n", e.what());
+    printf("AudioController: Created producer buffer pool - %u buffers, %u samples each\n",
+           config_.bufferCount, config_.samplesPerBuffer);
+
+    // Initialize I2S with the audio format
+    const audio_format_t* producerFormat = audio_i2s_setup(&audioFormat_, &i2sConfig_);
+    if (!producerFormat) {
+        printf("AudioController: ERROR - Failed to setup I2S\n");
+        // TODO: Add proper buffer pool cleanup when we find the right function
+        bufferPool_ = nullptr;
         return false;
     }
-    catch (...) {
-        printf("ERROR: AudioController::initialize() - Unknown exception during initialization\n");
+
+    printf("AudioController: I2S setup successful\n");
+
+    // Connect our producer pool to the I2S consumer
+    bool connect_ok = audio_i2s_connect(bufferPool_);
+    if (!connect_ok) {
+        printf("AudioController: ERROR - Failed to connect buffer pool to I2S\n");
+        // TODO: Add proper buffer pool cleanup when we find the right function
+        bufferPool_ = nullptr;
         return false;
     }
+
+    printf("AudioController: Connected producer pool to I2S consumer\n");
+
+    // Enable I2S output
+    audio_i2s_set_enabled(true);
+
+    printf("AudioController: I2S enabled\n");
+
+    initialized_ = true;
+    printf("AudioController: Initialization complete!\n");
+    return true;
 }
 
-bool AudioController::playAudio(Audio::AudioIndex audioIndex)
-{
-    if (!i2sController_) {
+void AudioController::shutdown() {
+    if (!initialized_) {
+        return;
+    }
+
+    printf("AudioController: Shutting down...\n");
+    
+    stopAudio();
+    
+    // Disable I2S
+    audio_i2s_set_enabled(false);
+    
+    if (bufferPool_) {
+        // TODO: Add proper buffer pool cleanup when we find the right function
+        bufferPool_ = nullptr;
+    }
+    
+    initialized_ = false;
+    printf("AudioController: Shutdown complete\n");
+}
+
+bool AudioController::playAudio(Audio::AudioIndex audioIndex) {
+    if (!initialized_) {
+        printf("AudioController: ERROR - Not initialized\n");
         return false;
     }
 
     // Get audio file info
-    const Audio::AudioFile* audioFile = getAudioFileInfo(audioIndex);
+    const Audio::AudioFile* audioFile = Audio::getAudioFile(audioIndex);
     if (!audioFile) {
+        printf("AudioController: ERROR - Invalid audio index %d\n", static_cast<int>(audioIndex));
         return false;
     }
 
-    // Use the new PCM playback method
-    return playPCMAudioData(audioFile->data, audioFile->sample_count);
-}
+    printf("AudioController: Playing audio file '%s' - %zu samples, %u Hz\n",
+           audioFile->name, audioFile->sample_count, audioFile->sample_rate);
 
-bool AudioController::playPCMAudioData(const int16_t* data, size_t sampleCount)
-{
-    if (!i2sController_ || !data || sampleCount == 0) {
-        return false;
-    }
-
-    // Stop current playback if any
+    // Stop any current playback
     stopAudio();
 
-    // Set up new PCM playback (16-bit)
-    currentPCMData_ = data;
-    currentPCMData32_ = nullptr;
-    using32BitData_ = false;
-    currentSampleCount_ = sampleCount;
-    currentSamplePosition_ = 0;
-    playbackState_ = PlaybackState::Playing;
+    // Set up new audio data
+    currentAudioData_ = audioFile->data;
+    currentAudioSize_ = audioFile->sample_count;
+    currentAudioPosition_ = 0;
 
-    // Start I2S output
-    i2sController_->start();
+    // Start playback
+    playbackState_ = PlaybackState::Playing;
     
+    // Start the audio worker loop
+    startAudioWorker();
+    
+    printf("AudioController: Playback started\n");
     return true;
 }
 
-bool AudioController::playPCMAudioData(const int32_t* data, size_t sampleCount)
-{
-    if (!i2sController_ || !data || sampleCount == 0) {
-        return false;
-    }
-
-    // Stop current playback if any
-    stopAudio();
-
-    // Set up new PCM playback (32-bit)
-    currentPCMData_ = nullptr;
-    currentPCMData32_ = data;
-    using32BitData_ = true;
-    currentSampleCount_ = sampleCount;
-    currentSamplePosition_ = 0;
-    playbackState_ = PlaybackState::Playing;
-
-    // Start I2S output
-    i2sController_->start();
-    
-    return true;
-}
-
-void AudioController::stopAudio()
-{
-    if (i2sController_) {
-        i2sController_->stop();
-    }
-    
-    playbackState_ = PlaybackState::Stopped;
-    currentPCMData_ = nullptr;
-    currentSampleCount_ = 0;
-    currentSamplePosition_ = 0;
-}
-
-void AudioController::pauseAudio()
-{
-    if (playbackState_ == PlaybackState::Playing && i2sController_) {
-        i2sController_->stop();
-        playbackState_ = PlaybackState::Paused;
-    }
-}
-
-void AudioController::resumeAudio()
-{
-    if (playbackState_ == PlaybackState::Paused && i2sController_) {
-        i2sController_->start();
-        playbackState_ = PlaybackState::Playing;
-    }
-}
-
-bool AudioController::isPlaying() const
-{
-    return playbackState_ == PlaybackState::Playing;
-}
-
-void AudioController::setVolume(float volume)
-{
-    volume_ = constrain(volume, 0.0f, 1.0f);
-}
-
-float AudioController::getVolume() const
-{
-    return volume_;
-}
-
-size_t AudioController::getAudioFileCount()
-{
-    return Audio::AUDIO_FILE_COUNT;
-}
-
-const Audio::AudioFile* AudioController::getAudioFileInfo(Audio::AudioIndex audioIndex)
-{
-    size_t index = static_cast<size_t>(audioIndex);
-    if (index >= Audio::AUDIO_FILE_COUNT) {
-        return nullptr;
-    }
-    
-    return &Audio::AUDIO_FILES[index];
-}
-
-// PCMAudioProcessor implementation
-void AudioController::PCMAudioProcessor::processAudio(const int32_t* input, int32_t* output, size_t frameCount)
-{
-    if (!controller_ || controller_->playbackState_ != PlaybackState::Playing) {
-        // Fill with silence
-        for (size_t i = 0; i < frameCount * 2; ++i) {
-            output[i] = 0;
-        }
-        // Update LED intensity for silence
-        controller_->updateLEDIntensity();
-        return;
-    }
-
-    const int16_t* pcmData = controller_->currentPCMData_;
-    const int32_t* pcmData32 = controller_->currentPCMData32_;
-    bool using32Bit = controller_->using32BitData_;
-    size_t& position = controller_->currentSamplePosition_;
-    size_t sampleCount = controller_->currentSampleCount_;
-    
-    for (size_t frame = 0; frame < frameCount; ++frame) {
-        int32_t sample32 = 0;
+void AudioController::startAudioWorker() {
+    // Launch a simple audio worker on core 1
+    multicore_launch_core1([]() {
+        AudioController* controller = AudioController::instance_;
+        if (!controller) return;
         
-        if (position < sampleCount) {
-            if (using32Bit && pcmData32) {
-                // Use 32-bit data directly
-                sample32 = pcmData32[position++];
-            } else if (!using32Bit && pcmData) {
-                // Convert 16-bit to 32-bit
-                int16_t sample16 = pcmData[position++];
-                sample16 = controller_->applyVolume(sample16);
-                sample32 = static_cast<int32_t>(sample16) << 16;
+        printf("AudioController: Audio worker started on core 1\n");
+        
+        while (controller->playbackState_ != PlaybackState::Stopped) {
+            // Get a buffer from the pool
+            audio_buffer_t* buffer = take_audio_buffer(controller->bufferPool_, false);
+            if (buffer) {
+                // Fill the buffer
+                controller->fillAudioBuffer(buffer);
+                
+                // Send it to the I2S output
+                give_audio_buffer(controller->bufferPool_, buffer);
+            } else {
+                // No buffer available, yield
+                sleep_ms(1);
             }
         }
         
-        // Convert 16-bit PCM to 32-bit I2S format (left and right channels)
-        // MAX98357A expects data in upper 16 bits, shifted left by 16
-        // with proper sign extension for negative values
-        output[frame * 2] = sample32;      // Left channel
-        output[frame * 2 + 1] = sample32;  // Right channel (mono to stereo)
-        
-        // Check if playback finished
-        if (position >= sampleCount) {
-            controller_->playbackState_ = PlaybackState::Stopped;
-            break;
-        }
-    }
-    
-    // Update LED intensity based on current audio
-    controller_->updateLEDIntensity();
+        printf("AudioController: Audio worker stopped\n");
+    });
 }
 
-int16_t AudioController::applyVolume(int16_t sample) const
-{
-    if (volume_ >= 1.0f) {
-        return sample;
+bool AudioController::stopAudio() {
+    if (playbackState_ == PlaybackState::Stopped) {
+        return true;
     }
+
+    printf("AudioController: Stopping audio playback\n");
     
-    if (volume_ <= 0.0f) {
+    playbackState_ = PlaybackState::Stopped;
+    currentAudioData_ = nullptr;
+    currentAudioSize_ = 0;
+    currentAudioPosition_ = 0;
+    audioIntensity_ = 0.0f;
+    
+    return true;
+}
+
+bool AudioController::pauseAudio() {
+    if (playbackState_ != PlaybackState::Playing) {
+        return false;
+    }
+
+    printf("AudioController: Pausing audio playback\n");
+    playbackState_ = PlaybackState::Paused;
+    return true;
+}
+
+bool AudioController::resumeAudio() {
+    if (playbackState_ != PlaybackState::Paused) {
+        return false;
+    }
+
+    printf("AudioController: Resuming audio playback\n");
+    playbackState_ = PlaybackState::Playing;
+    return true;
+}
+
+void AudioController::setVolume(float volume) {
+    // Clamp volume to valid range
+    volume = std::max(0.0f, std::min(1.0f, volume));
+    volume_ = volume;
+    printf("AudioController: Volume set to %.2f\n", volume);
+}
+
+size_t AudioController::fillAudioBuffer(audio_buffer_t* buffer) {
+    if (!buffer || playbackState_ != PlaybackState::Playing || !currentAudioData_) {
+        // Fill with silence
+        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * 2);
+        buffer->sample_count = buffer->max_sample_count;
         return 0;
     }
+
+    size_t samplesRemaining = currentAudioSize_.load() - currentAudioPosition_.load();
+    size_t samplesToWrite = std::min(samplesRemaining, static_cast<size_t>(buffer->max_sample_count));
     
-    // Apply volume scaling
-    float scaled = static_cast<float>(sample) * volume_;
-    return static_cast<int16_t>(constrain(scaled, -32768.0f, 32767.0f));
+    if (samplesToWrite == 0) {
+        // End of audio reached
+        playbackState_ = PlaybackState::Stopped;
+        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * 2);
+        buffer->sample_count = buffer->max_sample_count;
+        printf("AudioController: End of audio reached\n");
+        return 0;
+    }
+
+    // Copy audio data with volume control
+    int16_t* bufferSamples = (int16_t*)buffer->buffer->bytes;
+    const int16_t* audioSamples = currentAudioData_ + currentAudioPosition_.load();
+    float vol = volume_.load();
+    
+    for (size_t i = 0; i < samplesToWrite; ++i) {
+        // Apply volume and clamp to prevent overflow
+        float sample = static_cast<float>(audioSamples[i]) * vol;
+        sample = std::max(-32768.0f, std::min(32767.0f, sample));
+        bufferSamples[i] = static_cast<int16_t>(sample);
+    }
+    
+    // Fill remaining buffer with silence if needed
+    if (samplesToWrite < buffer->max_sample_count) {
+        memset(&bufferSamples[samplesToWrite], 0, 
+               (buffer->max_sample_count - samplesToWrite) * 2);
+    }
+    
+    buffer->sample_count = buffer->max_sample_count;
+    
+    // Update position
+    currentAudioPosition_ = currentAudioPosition_.load() + samplesToWrite;
+    
+    // Calculate audio intensity for LED effects
+    updateAudioIntensity(bufferSamples, samplesToWrite);
+    
+    return samplesToWrite;
 }
 
-float AudioController::getAudioIntensity() const
-{
-    return currentAudioIntensity_;
-}
-
-void AudioController::setLEDIntensityCallback(std::function<void(float)> callback)
-{
-    ledIntensityCallback_ = callback;
-}
-
-float AudioController::calculateAudioIntensity(const int16_t* samples, size_t count) const
-{
-    if (!samples || count == 0) {
-        return 0.0f;
+void AudioController::updateAudioIntensity(const int16_t* samples, size_t sampleCount) {
+    if (!samples || sampleCount == 0) {
+        audioIntensity_ = 0.0f;
+        return;
     }
     
     // Calculate RMS (Root Mean Square) for audio intensity
     float sum = 0.0f;
-    for (size_t i = 0; i < count; ++i) {
-        float sample = static_cast<float>(samples[i]) / 32768.0f; // Normalize to [-1, 1]
+    for (size_t i = 0; i < sampleCount; ++i) {
+        float sample = static_cast<float>(samples[i]) / 32768.0f;  // Normalize to [-1, 1]
         sum += sample * sample;
     }
     
-    float rms = std::sqrt(sum / static_cast<float>(count));
+    float rms = sqrtf(sum / static_cast<float>(sampleCount));
     
-    // Apply some scaling and smoothing for LED visualization
-    float intensity = std::min(rms * 3.0f, 1.0f); // Scale up for better LED response
+    // Apply some smoothing and scaling for LED effects
+    float intensity = std::min(1.0f, rms * 3.0f);  // Scale up for better LED response
     
-    return intensity;
+    // Simple low-pass filter for smoother LED transitions
+    float current = audioIntensity_.load();
+    audioIntensity_ = current * 0.7f + intensity * 0.3f;
 }
 
-void AudioController::updateLEDIntensity()
-{
-    if (ledIntensityCallback_ && currentPCMData_ && playbackState_ == PlaybackState::Playing) {
-        // Analyze a small window of audio around current position
-        const size_t windowSize = 256; // Small analysis window
-        size_t startPos = currentSamplePosition_;
-        size_t endPos = std::min(startPos + windowSize, currentSampleCount_);
-        size_t analyzeCount = endPos - startPos;
-        
-        if (analyzeCount > 0) {
-            currentAudioIntensity_ = calculateAudioIntensity(
-                currentPCMData_ + startPos, analyzeCount);
-            ledIntensityCallback_(currentAudioIntensity_);
-        }
-    } else if (ledIntensityCallback_ && playbackState_ != PlaybackState::Playing) {
-        // No audio playing, set intensity to 0
-        currentAudioIntensity_ = 0.0f;
-        ledIntensityCallback_(0.0f);
+// Audio callback - called by the I2S system when it needs data
+void AudioController::audioCallback(void* userData) {
+    AudioController* controller = static_cast<AudioController*>(userData);
+    if (!controller || !controller->initialized_) {
+        return;
     }
-}
-
-float AudioController::constrain(float value, float min, float max)
-{
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
+    
+    // Get a buffer to fill
+    audio_buffer_t* buffer = take_audio_buffer(controller->bufferPool_, false);
+    if (buffer) {
+        // Fill the buffer with audio data
+        controller->fillAudioBuffer(buffer);
+        
+        // Give the buffer back to the audio system
+        give_audio_buffer(controller->bufferPool_, buffer);
+    }
 }
 
 } // namespace Exterminate
