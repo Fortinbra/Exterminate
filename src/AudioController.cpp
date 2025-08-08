@@ -17,6 +17,7 @@ AudioController::AudioController(const Config& config)
     , volume_(1.0f)
     , audioIntensity_(0.0f)
     , bufferPool_(nullptr)
+    , actualI2SFormat_(nullptr)
     , initialized_(false)
     , currentAudioData_(nullptr)
     , currentAudioSize_(0)
@@ -43,15 +44,16 @@ bool AudioController::initialize() {
     // Set static instance for callbacks
     instance_ = this;
 
-    // Configure audio format for our embedded PCM data
-    // All our audio files are 22050Hz, mono, 16-bit
+    // Configure audio format for I2S output
+    // I2S typically expects stereo output, so we'll use 2 channels
+    // Our mono audio files will be duplicated to both channels
     audioFormat_ = {
         .sample_freq = config_.sampleRate,
         .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .channel_count = 1  // Mono
+        .channel_count = 2  // Stereo for I2S compatibility
     };
 
-    printf("AudioController: Audio format - %uHz, %u channels, 16-bit PCM\n", 
+    printf("AudioController: Audio format - %uHz, %u channels, 16-bit PCM (mono files converted to stereo)\n", 
            audioFormat_.sample_freq, audioFormat_.channel_count);
 
     // Configure I2S pins
@@ -65,10 +67,24 @@ bool AudioController::initialize() {
     printf("AudioController: I2S config - data_pin=%u, clock_base=%u\n",
            i2sConfig_.data_pin, i2sConfig_.clock_pin_base);
 
-    // Create audio buffer pool - we need a producer pool that we can fill
+    // Initialize I2S first to get the actual format it will use
+    const audio_format_t* actualFormat = audio_i2s_setup(&audioFormat_, &i2sConfig_);
+    if (!actualFormat) {
+        printf("AudioController: ERROR - Failed to setup I2S\n");
+        return false;
+    }
+
+    // Store the actual format for later use
+    actualI2SFormat_ = actualFormat;
+
+    printf("AudioController: I2S setup successful\n");
+    printf("AudioController: I2S actual format - %uHz, %u channels\n", 
+           actualFormat->sample_freq, actualFormat->channel_count);
+
+    // Now create the buffer pool with the exact format I2S expects
     audio_buffer_format_t bufferFormat = {
-        .format = &audioFormat_,
-        .sample_stride = 2  // 16-bit = 2 bytes per sample
+        .format = actualFormat,
+        .sample_stride = static_cast<uint16_t>(actualFormat->channel_count * 2)  // channels * 2 bytes per 16-bit sample
     };
     
     bufferPool_ = audio_new_producer_pool(&bufferFormat, config_.bufferCount, config_.samplesPerBuffer);
@@ -79,17 +95,6 @@ bool AudioController::initialize() {
 
     printf("AudioController: Created producer buffer pool - %u buffers, %u samples each\n",
            config_.bufferCount, config_.samplesPerBuffer);
-
-    // Initialize I2S with the audio format
-    const audio_format_t* producerFormat = audio_i2s_setup(&audioFormat_, &i2sConfig_);
-    if (!producerFormat) {
-        printf("AudioController: ERROR - Failed to setup I2S\n");
-        // TODO: Add proper buffer pool cleanup when we find the right function
-        bufferPool_ = nullptr;
-        return false;
-    }
-
-    printf("AudioController: I2S setup successful\n");
 
     // Connect our producer pool to the I2S consumer
     bool connect_ok = audio_i2s_connect(bufferPool_);
@@ -238,68 +243,77 @@ void AudioController::setVolume(float volume) {
 }
 
 size_t AudioController::fillAudioBuffer(audio_buffer_t* buffer) {
-    if (!buffer || playbackState_ != PlaybackState::Playing || !currentAudioData_) {
-        // Fill with silence
-        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * 2);
+    if (!buffer || playbackState_ != PlaybackState::Playing || !currentAudioData_ || !actualI2SFormat_) {
+        // Fill with silence - use actual format to determine bytes per sample
+        size_t bytesPerSample = actualI2SFormat_->channel_count * 2; // 2 bytes per 16-bit sample per channel
+        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * bytesPerSample);
         buffer->sample_count = buffer->max_sample_count;
         return 0;
     }
 
     size_t samplesRemaining = currentAudioSize_.load() - currentAudioPosition_.load();
-    size_t samplesToWrite = std::min(samplesRemaining, static_cast<size_t>(buffer->max_sample_count));
+    size_t monoSamplesToRead = std::min(samplesRemaining, static_cast<size_t>(buffer->max_sample_count));
     
-    if (samplesToWrite == 0) {
+    if (monoSamplesToRead == 0) {
         // End of audio reached
         playbackState_ = PlaybackState::Stopped;
-        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * 2);
+        size_t bytesPerSample = actualI2SFormat_->channel_count * 2;
+        memset(buffer->buffer->bytes, 0, buffer->max_sample_count * bytesPerSample);
         buffer->sample_count = buffer->max_sample_count;
         printf("AudioController: End of audio reached\n");
         return 0;
     }
 
-    // Copy audio data with volume control
+    // Convert mono to the actual I2S format
     int16_t* bufferSamples = (int16_t*)buffer->buffer->bytes;
     const int16_t* audioSamples = currentAudioData_ + currentAudioPosition_.load();
     float vol = volume_.load();
     
-    for (size_t i = 0; i < samplesToWrite; ++i) {
+    for (size_t i = 0; i < monoSamplesToRead; ++i) {
         // Apply volume and clamp to prevent overflow
         float sample = static_cast<float>(audioSamples[i]) * vol;
         sample = std::max(-32768.0f, std::min(32767.0f, sample));
-        bufferSamples[i] = static_cast<int16_t>(sample);
+        int16_t outputSample = static_cast<int16_t>(sample);
+        
+        // Duplicate mono sample to all channels based on actual format
+        for (uint16_t ch = 0; ch < actualI2SFormat_->channel_count; ++ch) {
+            bufferSamples[i * actualI2SFormat_->channel_count + ch] = outputSample;
+        }
     }
     
     // Fill remaining buffer with silence if needed
-    if (samplesToWrite < buffer->max_sample_count) {
-        memset(&bufferSamples[samplesToWrite], 0, 
-               (buffer->max_sample_count - samplesToWrite) * 2);
+    if (monoSamplesToRead < buffer->max_sample_count) {
+        size_t remainingSamples = buffer->max_sample_count - monoSamplesToRead;
+        size_t bytesToClear = remainingSamples * actualI2SFormat_->channel_count * 2;
+        memset(&bufferSamples[monoSamplesToRead * actualI2SFormat_->channel_count], 0, bytesToClear);
     }
     
     buffer->sample_count = buffer->max_sample_count;
     
-    // Update position
-    currentAudioPosition_ = currentAudioPosition_.load() + samplesToWrite;
+    // Update position (in mono samples)
+    currentAudioPosition_ = currentAudioPosition_.load() + monoSamplesToRead;
     
-    // Calculate audio intensity for LED effects
-    updateAudioIntensity(bufferSamples, samplesToWrite);
+    // Calculate audio intensity for LED effects (use first channel)
+    updateAudioIntensity(bufferSamples, monoSamplesToRead);
     
-    return samplesToWrite;
+    return monoSamplesToRead;
 }
 
-void AudioController::updateAudioIntensity(const int16_t* samples, size_t sampleCount) {
-    if (!samples || sampleCount == 0) {
+void AudioController::updateAudioIntensity(const int16_t* samples, size_t monoSampleCount) {
+    if (!samples || monoSampleCount == 0 || !actualI2SFormat_) {
         audioIntensity_ = 0.0f;
         return;
     }
     
     // Calculate RMS (Root Mean Square) for audio intensity
+    // Since we duplicated mono samples to all channels, analyze first channel only
     float sum = 0.0f;
-    for (size_t i = 0; i < sampleCount; ++i) {
-        float sample = static_cast<float>(samples[i]) / 32768.0f;  // Normalize to [-1, 1]
+    for (size_t i = 0; i < monoSampleCount; ++i) {
+        float sample = static_cast<float>(samples[i * actualI2SFormat_->channel_count]) / 32768.0f;  // First channel, normalize to [-1, 1]
         sum += sample * sample;
     }
     
-    float rms = sqrtf(sum / static_cast<float>(sampleCount));
+    float rms = sqrtf(sum / static_cast<float>(monoSampleCount));
     
     // Apply some smoothing and scaling for LED effects
     float intensity = std::min(1.0f, rms * 3.0f);  // Scale up for better LED response

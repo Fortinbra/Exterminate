@@ -151,6 +151,7 @@ private:
     // Pico Extras I2S components
     audio_buffer_pool_t* bufferPool_;
     audio_format_t audioFormat_;
+    const audio_format_t* actualI2SFormat_;  // Store the actual format returned by I2S
     audio_i2s_config_t i2sConfig_;
     bool initialized_;
     
