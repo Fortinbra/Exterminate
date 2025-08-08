@@ -41,7 +41,7 @@ public:
             return Config{
                 .dataPin = 9,          // GPIO 9 = I2S DOUT
                 .clockPinBase = 6,     // GPIO 6 = BCK, GPIO 7 = LRCLK (per documentation)
-                .sampleRate = 22050,   // Match our embedded audio files (they are 22.05kHz)
+                .sampleRate = 44100,   // Match our embedded audio files (they are 44.1kHz)
                 .bufferCount = 3,      // Triple buffering for smooth playback
                 .samplesPerBuffer = 256 // Small buffers for low latency
             };
