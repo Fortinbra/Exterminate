@@ -8,29 +8,6 @@
 #include <cstring>
 
 #include "00001.h"
-#include "00002.h"
-#include "00003.h"
-#include "00004.h"
-#include "00005.h"
-#include "00006.h"
-#include "00007.h"
-#include "00008.h"
-#include "00009.h"
-#include "00010.h"
-#include "00011.h"
-#include "00012.h"
-#include "00013.h"
-#include "00014.h"
-#include "00015.h"
-#include "00016.h"
-#include "00017.h"
-#include "00018.h"
-#include "00019.h"
-#include "00020.h"
-#include "00021.h"
-#include "00022.h"
-#include "00023.h"
-#include "00024.h"
 
 namespace Exterminate {
 namespace Audio {
@@ -58,30 +35,7 @@ extern const size_t AUDIO_FILE_COUNT;
 // Audio file indices for easy access
 enum class AudioIndex : size_t {
     AUDIO_00001 = 0,
-    AUDIO_00002 = 1,
-    AUDIO_00003 = 2,
-    AUDIO_00004 = 3,
-    AUDIO_00005 = 4,
-    AUDIO_00006 = 5,
-    AUDIO_00007 = 6,
-    AUDIO_00008 = 7,
-    AUDIO_00009 = 8,
-    AUDIO_00010 = 9,
-    AUDIO_00011 = 10,
-    AUDIO_00012 = 11,
-    AUDIO_00013 = 12,
-    AUDIO_00014 = 13,
-    AUDIO_00015 = 14,
-    AUDIO_00016 = 15,
-    AUDIO_00017 = 16,
-    AUDIO_00018 = 17,
-    AUDIO_00019 = 18,
-    AUDIO_00020 = 19,
-    AUDIO_00021 = 20,
-    AUDIO_00022 = 21,
-    AUDIO_00023 = 22,
-    AUDIO_00024 = 23,
-    COUNT = 24
+    COUNT = 1
 };
 
 // Helper functions

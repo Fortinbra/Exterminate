@@ -177,7 +177,7 @@ Exterminate/
 │   ├── exterminate_platform.h     # Platform interface declarations
 │   ├── MotorController.h          # Motor driver class interface
 │   ├── AudioController.h          # Audio controller class interface
-│   ├── LEDController.h            # LED effects controller interface
+│   ├── SimpleLED.h                # Minimal LED helper (PWM)
 │   ├── I2S.h                      # PIO-based I2S audio interface
 │   └── audio/                     # Generated audio headers (from MP3s)
 │       ├── 00001.h                # "Exterminate!" audio data
@@ -189,7 +189,7 @@ Exterminate/
 │   ├── exterminate_platform.cpp  # BluePad32 platform implementation
 │   ├── MotorController.cpp       # Motor control implementation
 │   ├── AudioController.cpp       # Audio control implementation
-│   ├── LEDController.cpp         # LED effects implementation
+│   ├── SimpleLED.cpp             # Minimal LED helper implementation
 │   ├── I2S.cpp                   # PIO-based I2S implementation
 │   ├── i2s.pio                   # PIO assembly for I2S state machines
 │   ├── btstack_config.h          # BTstack configuration
@@ -239,11 +239,11 @@ The project follows **SOLID principles** and modern C++ best practices:
 - **Features**: 22.05kHz PCM audio playback, real-time audio intensity calculation, LED synchronization
 - **Interface**: `playAudio()`, `stopAudio()`, `getAudioIntensity()`, LED integration methods
 
-#### `LEDController`
+#### `SimpleLED`
 
-- **Purpose**: PWM-based LED effects for audio visualization
-- **Features**: Multiple effect patterns (Pulse, Alternate, Wave, Breathe), real-time intensity control
-- **Interface**: `setEffect()`, `updateLEDs()`, `setBrightness()`, pattern configuration
+- **Purpose**: Lightweight PWM helper for external LEDs
+- **Features**: Pin init, PWM init, and brightness setting; audio-driven updates done in `main.cpp`
+- **Interface**: `initializePwmPin()`, `setBrightnessPin()`
 
 #### `I2S`
 
@@ -293,12 +293,9 @@ AudioController::Config audioConfig = {
     .bitsPerSample = 16        // 16-bit PCM audio
 };
 
-// LEDController configuration for audio visualization
-LEDController::Config ledConfig = {
-    .ledPins = {11, 12, 13, 14}, // GPIO pins for audio LEDs
-    .numLEDs = 4,                // Number of visualization LEDs
-    .pwmFrequency = 1000         // 1kHz PWM frequency
-};
+// SimpleLED setup for audio visualization (example)
+Exterminate::SimpleLED::initializePwmPin(11, 255, 4.0f);
+Exterminate::SimpleLED::initializePwmPin(12, 255, 4.0f);
 
 // Controller status LED configuration
 const uint controllerStatusPin = 15;  // GPIO 15 for status indication

@@ -26,4 +26,10 @@ bool initializePin(unsigned int pin);
 void onPin(unsigned int pin);
 void offPin(unsigned int pin);
 
+// Optional: Initialize PWM on a specific pin for brightness control (returns false if not supported)
+bool initializePwmPin(unsigned int pin, uint16_t wrap = 255, float clkdiv = 4.0f);
+
+// Set PWM brightness (0.0 to 1.0) on a specific pin initialized with initializePwmPin
+void setBrightnessPin(unsigned int pin, float brightness);
+
 }

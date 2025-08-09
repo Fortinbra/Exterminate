@@ -44,6 +44,7 @@ add_executable(Exterminate
     src/AudioData.cpp
     src/AudioIndex.cpp
     src/SimpleLED.cpp
+    src/MotorController.cpp
 )
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
@@ -57,7 +58,8 @@ target_link_libraries(Exterminate
         pico_stdlib
         pico_audio_i2s
         pico_multicore
-        hardware_gpio)
+    hardware_gpio
+    hardware_pwm)
 
 # Add the standard include files to the build
 target_include_directories(Exterminate PRIVATE

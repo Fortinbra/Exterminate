@@ -58,17 +58,20 @@ bool MotorController::initialize()
         rightPwmChannelA_ = pwm_gpio_to_channel(config_.rightMotorPin1);
         rightPwmChannelB_ = pwm_gpio_to_channel(config_.rightMotorPin2);
 
-        // Set PWM frequency
-        uint32_t clockDiv = 125000000 / (config_.pwmFrequency * 65536);
-        if (clockDiv < 1) clockDiv = 1;
-        if (clockDiv > 255) clockDiv = 255;
+    // Set PWM to requested frequency: f = sys_clk / (clkdiv * (wrap + 1))
+    // Prefer clkdiv = 1 for maximum resolution and compute wrap accordingly
+    constexpr uint32_t sys_clk_hz = 125000000; // 125 MHz default
+    uint32_t target = config_.pwmFrequency == 0 ? 20000 : config_.pwmFrequency; // default 20kHz
+    if (target < 100) target = 100; // avoid extremely low frequencies
+    uint32_t wrap = (sys_clk_hz / target);
+    if (wrap == 0) wrap = 1;
+    if (wrap > 0) wrap -= 1;
+    if (wrap > 65535u) wrap = 65535u;
 
-        pwm_set_clkdiv(leftPwmSlice_, static_cast<float>(clockDiv));
-        pwm_set_clkdiv(rightPwmSlice_, static_cast<float>(clockDiv));
-
-        // Set PWM wrap value (controls resolution)
-        pwm_set_wrap(leftPwmSlice_, 65535);
-        pwm_set_wrap(rightPwmSlice_, 65535);
+    pwm_set_clkdiv(leftPwmSlice_, 1.0f);
+    pwm_set_clkdiv(rightPwmSlice_, 1.0f);
+    pwm_set_wrap(leftPwmSlice_, static_cast<uint16_t>(wrap));
+    pwm_set_wrap(rightPwmSlice_, static_cast<uint16_t>(wrap));
 
         // Start with motors stopped
         stopAllMotors();

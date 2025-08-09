@@ -88,16 +88,15 @@ The system includes custom PIO assembly in `src/i2s.pio`:
 
 ```cpp
 #include "AudioController.h"
-#include "LEDController.h"
+#include "SimpleLED.h"
 #include "audio/audio_index.h"
 ```
 
 ### Basic Usage
 
 ```cpp
-// Initialize audio and LED controllers
+// Initialize audio
 AudioController audioController;
-LEDController ledController;
 
 // Configure I2S with PIO for MAX98357A
 AudioController::Config audioConfig = {
@@ -108,20 +107,15 @@ AudioController::Config audioConfig = {
     .bitsPerSample = 16        // 16-bit PCM audio
 };
 
-// Configure LED visualization
-LEDController::Config ledConfig = {
-    .ledPins = {11, 12, 13, 14}, // GPIO pins for LEDs
-    .numLEDs = 4,                // Number of LEDs
-    .pwmFrequency = 1000         // 1kHz PWM
-};
-
-// Initialize both controllers
+// Initialize audio and LED PWM pins
 audioController.begin(audioConfig);
-ledController.begin(ledConfig);
 
-// Play audio with LED synchronization
+// Use SimpleLED to set up PWM on two external LEDs (GPIO 11 and 12)
+Exterminate::SimpleLED::initializePwmPin(11, /*wrap*/ 255, /*clkdiv*/ 4.0f);
+Exterminate::SimpleLED::initializePwmPin(12, /*wrap*/ 255, /*clkdiv*/ 4.0f);
+
+// Play audio; a repeating timer in main.cpp maps audio intensity to LED brightness
 audioController.playAudio(Audio::AudioIndex::AUDIO_00001);
-ledController.setEffect(LEDController::Effect::AUDIO_REACTIVE);
 ```
 
 ### Initialize Audio Controller

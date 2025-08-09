@@ -171,32 +171,25 @@ class AudioController {
 };
 ```
 
-### 6. LED Controller Subsystem
+### 6. LED Subsystem (SimpleLED)
 
-**Files**: `src/LEDController.cpp`, `include/LEDController.h`
+**Files**: `src/SimpleLED.cpp`, `include/SimpleLED.h`
 
 **Responsibilities**:
-- PWM-based LED intensity control
-- Audio-reactive visual effects
-- Multiple lighting patterns and effects
-- Real-time LED synchronization
+- Initialize PWM on external LED pins
+- Set per-pin brightness from 0.0 to 1.0
+- Integrate with audio intensity via a repeating timer in `main.cpp`
 
 **Architecture**:
-- **PWM Control**: Hardware PWM for smooth LED dimming
-- **Effect Patterns**: Multiple visual effect algorithms
-- **Audio Integration**: Real-time response to audio intensity
-- **Modular Design**: Easy addition of new effects
+- **PWM Control**: Hardware PWM via Pico SDK
+- **Mapping**: Deadzone, gamma and peak-hold applied in `main.cpp`
 
 ```cpp
-class LEDController {
-    // Configure LED hardware
-    explicit LEDController(const Config& config);
-    
-    // Effect control interface
-    void setEffect(Effect effect);
-    void updateLEDs(float intensity);  // Audio-driven updates
-    void setBrightness(float brightness);
-};
+// Example usage in main.cpp
+Exterminate::SimpleLED::initializePwmPin(11, 255, 4.0f);
+Exterminate::SimpleLED::initializePwmPin(12, 255, 4.0f);
+Exterminate::SimpleLED::setBrightnessPin(11, 0.75f);
+Exterminate::SimpleLED::setBrightnessPin(12, 0.5f);
 ```
 
 ## Data Flow Architecture

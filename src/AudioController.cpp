@@ -82,12 +82,14 @@ bool AudioController::initialize() {
            actualFormat->sample_freq, actualFormat->channel_count);
 
     // Now create the buffer pool with the exact format I2S expects
-    audio_buffer_format_t bufferFormat = {
+    // Keep the buffer format as a member so its lifetime exceeds the pool's
+    bufferFormat_ = {
         .format = actualFormat,
-        .sample_stride = static_cast<uint16_t>(actualFormat->channel_count * 2)  // channels * 2 bytes per 16-bit sample
+        // sample_stride is bytes per interleaved sample frame: channels * bytes_per_sample
+        .sample_stride = static_cast<uint16_t>(actualFormat->channel_count * 2)
     };
-    
-    bufferPool_ = audio_new_producer_pool(&bufferFormat, config_.bufferCount, config_.samplesPerBuffer);
+
+    bufferPool_ = audio_new_producer_pool(&bufferFormat_, config_.bufferCount, config_.samplesPerBuffer);
     if (!bufferPool_) {
         printf("AudioController: ERROR - Failed to create buffer pool\n");
         return false;
