@@ -43,6 +43,7 @@ add_executable(Exterminate
     src/AudioController.cpp
     src/AudioData.cpp
     src/AudioIndex.cpp
+    src/SimpleLED.cpp
 )
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
