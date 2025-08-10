@@ -27,7 +27,7 @@ endif()
 # The custom board files live in include/boards and boards
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/include/boards)
 set(PICO_BOARD_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
-set(PICO_BOARD pico_plus2_xl_w CACHE STRING "Board type" FORCE)
+set(PICO_BOARD pimoroni_pico_plus2_w_rp2350 CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
