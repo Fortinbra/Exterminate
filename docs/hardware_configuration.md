@@ -25,20 +25,20 @@ The Raspberry Pi Pico W serves as the main microcontroller with built-in WiFi an
 |------|----------|-----------|-----------|-------|
 | **0** | UART TX | Debug Console | Output | USB Serial |
 | **1** | UART RX | Debug Console | Input | USB Serial |
-| **2** | AIN1 | Left Motor Pin 1 | Output | DRV8833 PWM |
-| **3** | AIN2 | Left Motor Pin 2 | Output | DRV8833 PWM |
+| **2** | AIN2 | Left Motor Pin 2 | Output | DRV8833 PWM |
+| **3** | AIN1 | Left Motor Pin 1 | Output | DRV8833 PWM |
 | **4** | BIN1 | Right Motor Pin 1 | Output | DRV8833 PWM |
 | **5** | BIN2 | Right Motor Pin 2 | Output | DRV8833 PWM |
 | **6** | I2S BCLK | Audio Bit Clock | Output | PIO I2S |
 | **7** | *Reserved* | Future Expansion | - | Available |
-| **8** | I2S LRCLK | Audio Word Select | Output | PIO I2S |
+| **7** | I2S LRCLK | Audio Word Select | Output | PIO I2S |
 | **9** | I2S DIN | Audio Data Out | Output | PIO I2S |
 | **10** | *Reserved* | Future Expansion | - | Available |
-| **11** | LED PWM | Audio Viz LED 1 | Output | PWM Control |
-| **12** | LED PWM | Audio Viz LED 2 | Output | PWM Control |
-| **13** | LED PWM | Audio Viz LED 3 | Output | PWM Control |
-| **14** | LED PWM | Audio Viz LED 4 | Output | PWM Control |
-| **15** | Status LED | Controller Status | Output | Digital Control |
+| **11** | LED PWM | Dome Red LED 1 (Audio Viz) | Output | PWM Control |
+| **12** | LED PWM | Dome Red LED 2 (Audio Viz) | Output | PWM Control |
+| **13** | *Reserved* | Future Expansion | - | Available |
+| **14** | *Reserved* | Future Expansion | - | Available |
+| **15** | Blue Status LED | Eye Stalk Bluetooth Status | Output | Digital Control |
 | **16** | Servo PWM | Eye Stalk Servo | Output | 50Hz PWM |
 | **17-25** | *Reserved* | Future Expansion | - | Available |
 
@@ -68,8 +68,8 @@ VSYS   -->  VMOT        Motor Power (5V from USB)
 ```
 Pico W      DRV8833     Function
 ------      -------     --------
-GPIO 2 -->  AIN1        Left Motor Direction 1
-GPIO 3 -->  AIN2        Left Motor Direction 2
+GPIO 3 -->  AIN1        Left Motor Direction 1
+GPIO 2 -->  AIN2        Left Motor Direction 2
 GPIO 4 -->  BIN1        Right Motor Direction 1
 GPIO 5 -->  BIN2        Right Motor Direction 2
 ```
@@ -109,9 +109,9 @@ MAX98357A Pin Pico W      Function
 ------------- ------      --------
 VIN      -->  5V          Power (5V from VSYS)
 GND      -->  GND         Ground
-BCLK     -->  GPIO 6      Bit Clock (PIO-generated)
-LRCLK    -->  GPIO 8      Left/Right Clock (PIO-generated)
-DIN      -->  GPIO 9      Data Input (PIO-generated)
+BCLK     -->  GPIO 6      Bit Clock (I2S)
+LRCLK    -->  GPIO 7      Left/Right Clock (I2S)
+DIN      -->  GPIO 9      Data Input (I2S)
 GAIN     -->  GND         Gain Setting (9dB when tied to GND)
 SD       -->  3V3         Shutdown Control (3V3 = enabled)
 ```
@@ -131,57 +131,51 @@ Speaker- -->  Speaker Negative Terminal
 - **I2S Interface**: Clean digital audio interface
 - **Compact**: Small form factor suitable for embedded projects
 
-### Audio Visualization LEDs
+### Audio Visualization LEDs (Dome, Red)
 
-**LED Array for Dalek Head Lighting:**
+**LED Array for Dalek Head Lighting (2x Red):**
+
 ```text
 LED Pin      Pico W      Function
 -------      ------      --------
 LED 1 +  --> GPIO 11     PWM Control (Audio Intensity)
 LED 2 +  --> GPIO 12     PWM Control (Audio Intensity)
-LED 3 +  --> GPIO 13     PWM Control (Audio Intensity)
-LED 4 +  --> GPIO 14     PWM Control (Audio Intensity)
-All -    --> GND         Common Ground (via 220Ω resistors)
+All -    --> GND         Common Ground
 ```
 
-**LED Requirements:**
-- **Type**: Standard 5mm or 3mm LEDs (red/orange for Dalek aesthetic)
-- **Current**: ~20mA per LED maximum
-- **Resistors**: 220Ω current limiting resistors for 3.3V operation
-- **Effects**: Real-time audio-reactive intensity control via PWM
+**LED Requirements and Resistors (3.3 V GPIO):**
+- Dome LEDs (red): 150Ω recommended (≈7–9 mA each). Use 100Ω if higher brightness is needed (≈11–13 mA), staying within GPIO limits.
 
-### Controller Status LED
+- One series resistor per LED.
+- Red LED (Vf ≈ 2.0–2.2 V):
+   - 150Ω → ~7–9 mA (recommended default)
+   - 100Ω → ~11–13 mA (upper end of per‑pin drive)
+- Blue LED (Vf ≈ 3.0–3.2 V):
+   - 100–150Ω → ~1–3 mA (limited headroom at 3.3 V)
+- For true ~20 mA brightness:
+   - Red at 3.3 V: use a transistor/MOSFET driver and 62–68Ω.
+   - Blue: use a 5 V LED supply with a driver and 100Ω (common ground with Pico).
 
-**Status Indication LED:**
+**Effects:**
+
+- Two red dome LEDs flash in sync with audio intensity via PWM to represent speech.
+
+### Bluetooth Status LED (Eye Stalk, Blue)
+
+**Wiring:**
+
 ```text
-Status LED   Pico W      Function
-----------   ------      --------
-LED +   -->  GPIO 15     Digital Control (On/Off/Flash)
-LED -   -->  GND         Ground (via 220Ω resistor)
+Eye Stalk LED   Pico W      Function
+--------------  ------      --------
+LED +       -->  GPIO 15     Digital Control (Status)
+LED -       -->  GND         Ground (via series resistor: blue 100–150Ω)
 ```
 
 **Status Patterns:**
-- **Solid On**: Controller connected and paired
-- **Flashing**: Waiting for controller connection (500ms interval)
-- **Off**: System starting up or error state
-```
-DAC Module  Pico W      Function
-----------  ------      --------
-VCC    -->  3V3         Power (3.3V)
-GND    -->  GND         Ground
-BCLK   -->  GPIO 18     Bit Clock
-DOUT   -->  GPIO 19     Data Output
-LRCLK  -->  GPIO 20     Left/Right Clock
-```
 
-**Audio Output:**
-```
-DAC Module  Output      Function
-----------  ------      --------
-LOUT   -->  Speaker +   Left Audio Channel
-ROUT   -->  Speaker +   Right Audio Channel (or bridge)
-GND    -->  Speaker -   Audio Ground
-```
+- **Blinking**: Bluetooth pairing/connecting
+- **Solid**: Bluetooth paired/connected
+
 
 ## Power Distribution
 
@@ -199,18 +193,21 @@ GND    -->  Speaker -   Audio Ground
 ### Recommended Power Supply
 
 **For USB Development:**
+
 - **USB Power**: 5V @ 500mA (limited)
 - **Suitable for**: Testing, programming, light motors
 - **Limitations**: May brownout with full motor load
 
 **For Full Operation:**
+
 - **External Supply**: 6V @ 3A minimum
 - **Connection**: Via VSYS pin or external power distribution
 - **Protection**: Fuse or current limiting recommended
 
 ### Power Distribution Schematic
 
-```
+
+```text
 External 6V Supply
        |
     [FUSE]
@@ -228,12 +225,14 @@ VSYS      DRV8833 VMOT
 ### PCB Layout Considerations
 
 **Signal Routing:**
+
 - Keep PWM traces short and direct
 - Separate analog and digital grounds where possible
 - Use ground planes for EMI reduction
 - Route I2S signals with controlled impedance
 
 **Power Routing:**
+
 - Use thick traces for motor power (≥20 mil)
 - Add bulk capacitance near DRV8833 (100µF+)
 - Decouple all IC power pins (0.1µF ceramic)
@@ -242,16 +241,19 @@ VSYS      DRV8833 VMOT
 ### Mechanical Mounting
 
 **Pico W Mounting:**
+
 - Use M2.5 standoffs to prevent board flex
 - Ensure adequate ventilation around CYW43 chip
 - Keep antenna area clear of metal objects
 
 **Motor Mounting:**
+
 - Secure motors to prevent vibration
 - Use flexible wires to accommodate movement
 - Add encoder feedback if precise positioning needed
 
 **Servo Mounting:**
+
 - Mount servo horn securely to eye stalk mechanism
 - Ensure full range of motion without binding
 - Use appropriate torque limits to prevent damage
@@ -261,12 +263,14 @@ VSYS      DRV8833 VMOT
 ### Programming Interface
 
 **Built-in USB:**
-```
+
+```text
 Pico W USB-C --> Computer USB-A/C
 ```
 
 **Debug Interface (Optional SWD):**
-```
+
+```text
 Pico W      Debugger    Function
 ------      --------    --------
 SWCLK  -->  SWCLK       SWD Clock
@@ -277,12 +281,14 @@ GND    -->  GND         Ground
 ### Development Tools Required
 
 **Hardware:**
+
 - USB-C cable for programming
 - Breadboard or PCB for prototyping
 - Multimeter for debugging
 - Oscilloscope (optional, for PWM verification)
 
 **Software:**
+
 - Pico SDK toolchain
 - VS Code with Pico extension
 - Ninja build system
@@ -293,12 +299,14 @@ GND    -->  GND         Ground
 ### Electrical Safety
 
 **Power Supply:**
+
 - Never exceed 5.5V on VSYS pin
 - Use current limiting to prevent overcurrent
 - Add reverse polarity protection
 - Ensure adequate heat dissipation
 
 **Motor Safety:**
+
 - Motors can generate back-EMF when stopped suddenly
 - DRV8833 includes protection diodes
 - Add external capacitors if using long motor leads
@@ -307,12 +315,14 @@ GND    -->  GND         Ground
 ### Mechanical Safety
 
 **Moving Parts:**
+
 - Ensure all rotating parts are properly guarded
 - Use appropriate servo torque limits
 - Implement software position limits
 - Add manual emergency stop capability
 
 **Structural:**
+
 - Mount all components securely
 - Use appropriate fasteners for loads
 - Consider vibration and shock resistance
@@ -323,24 +333,28 @@ GND    -->  GND         Ground
 ### Common Hardware Issues
 
 **No Power:**
+
 1. Check USB connection and cable
 2. Verify power supply voltage and current capacity
 3. Look for short circuits or component damage
 4. Measure voltages at key test points
 
 **Motors Not Working:**
+
 1. Verify DRV8833 power and ground connections
 2. Check PWM signals with oscilloscope/multimeter
 3. Test motor continuity and resistance
 4. Ensure adequate power supply current
 
 **Servo Not Responding:**
+
 1. Check 5V power supply to servo
 2. Verify PWM signal frequency (50Hz)
 3. Test servo with known-good controller
 4. Check for mechanical binding
 
 **Audio Issues:**
+
 1. Verify I2S DAC power and connections
 2. Check I2S signal timing with oscilloscope
 3. Test with known-good audio source
@@ -349,11 +363,13 @@ GND    -->  GND         Ground
 ### Debug Test Points
 
 **Power Rails:**
+
 - VSYS: Should be 5V (USB) or external supply voltage
 - 3V3: Should be 3.3V ±5%
 - DRV8833 VCC: Should match 3V3
 
 **PWM Signals:**
+
 - GPIO 2-5: Should show PWM when motors active
 - GPIO 16: Should show 50Hz PWM when servo active
 - GPIO 18-20: Should show I2S signals when audio playing
