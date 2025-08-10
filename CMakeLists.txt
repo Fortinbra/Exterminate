@@ -23,7 +23,11 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pimoroni_pico_plus2_rp2350 CACHE STRING "Board type")
+# Use a custom board that mirrors Pimoroni Pico Plus 2 but with CYW43 (WiFi/BT) pins like Pico W
+# The custom board files live in include/boards and boards
+set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/include/boards)
+set(PICO_BOARD_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+set(PICO_BOARD pico_plus2_xl_w CACHE STRING "Board type" FORCE)
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -58,8 +62,15 @@ target_link_libraries(Exterminate
         pico_stdlib
         pico_audio_i2s
         pico_multicore
-    hardware_gpio
-    hardware_pwm)
+        hardware_gpio
+        hardware_pwm)
+
+# Link CYW43 arch only if available in this SDK install
+if (TARGET pico_cyw43_arch_none)
+    target_link_libraries(Exterminate pico_cyw43_arch_none)
+else()
+    message(STATUS "CYW43 arch not available in this SDK; building without WiFi/BT support.")
+endif()
 
 # Add the standard include files to the build
 target_include_directories(Exterminate PRIVATE

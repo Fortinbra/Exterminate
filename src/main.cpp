@@ -7,6 +7,18 @@
 #include "MotorController.h"
 #include "audio/00001.h"  // Boot sound
 
+// Guard optional CYW43 include so builds succeed even if headers aren't present
+#if defined(__has_include)
+#  if __has_include("pico/cyw43_arch.h")
+#    include "pico/cyw43_arch.h"
+#    define EX_HAS_CYW43 1
+#  else
+#    define EX_HAS_CYW43 0
+#  endif
+#else
+#  define EX_HAS_CYW43 0
+#endif
+
 using namespace Exterminate;
 
 int main() {
@@ -74,6 +86,18 @@ int main() {
         printf("Audio initialization failed!\n");
     }
     
+    // Minimal cyw43 init to validate board setup (no background thread)
+#if EX_HAS_CYW43
+    if (cyw43_arch_init()) {
+        printf("cyw43 init failed (expected if no module)") ;
+    } else {
+        printf("cyw43 init ok\n");
+        cyw43_arch_deinit();
+    }
+#else
+    printf("CYW43 headers not available at build time; skipping init.\n");
+#endif
+
     // Initialize DRV8833 motor controller and spin motors at startup
     using Exterminate::MotorController;
     
