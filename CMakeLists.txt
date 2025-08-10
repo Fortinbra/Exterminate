@@ -23,11 +23,8 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-# Use a custom board that mirrors Pimoroni Pico Plus 2 but with CYW43 (WiFi/BT) pins like Pico W
-# The custom board files live in include/boards and boards
-set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/include/boards)
-set(PICO_BOARD_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
-set(PICO_BOARD pimoroni_pico_plus2_w_rp2350 CACHE STRING "Board type")
+# Use the official Pimoroni Pico Plus 2 W RP2350 board definition
+set(PICO_BOARD pimoroni_pico_plus2_w_rp2350 CACHE STRING "Board type" FORCE)
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
