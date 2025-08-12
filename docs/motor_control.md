@@ -2,32 +2,39 @@
 
 ## Overview
 
-The Motor Control System provides differential drive control for the Exterminate Dalek robot using a DRV8833 dual H-bridge motor driver. This system enables forward/backward movement, turning, and rotation in place.
+The Motor Control System provides differential drive control for the Exterminate Dalek robot using the Pimoroni Motor Shim for Pico (stacked on the Pico LiPo 2 XL W). This system enables forward/backward movement, turning, and rotation in place.
 
 ## Hardware Setup
 
-### DRV8833 Motor Driver
+### Pimoroni Motor Shim for Pico
 
-The DRV8833 is a dual H-bridge motor driver that can control two DC motors with speeds up to 1.2A continuous current per motor.
+The Motor Shim is a dual H-bridge driver board that stacks on the Pico and exposes motor terminals and VMOTOR input. It routes control pins to Pico GPIO as follows:
 
-**Pin Connections:**
+```text
+Pico GPIO | Shim Signal | Function
+----------|-------------|---------
+GPIO 6    | AIN1        | Left Motor Direction 1 (PWM)
+GPIO 7    | AIN2        | Left Motor Direction 2 (PWM)
+GPIO 27   | BIN1        | Right Motor Direction 1 (PWM)
+GPIO 26   | BIN2        | Right Motor Direction 2 (PWM)
 ```
-Pico Pin  | DRV8833 Pin | Function
-----------|-------------|----------
-GPIO 3    | AIN1        | Left Motor Direction 1
-GPIO 2    | AIN2        | Left Motor Direction 2
-GPIO 4    | BIN1        | Right Motor Direction 1
-GPIO 5    | BIN2        | Right Motor Direction 2
-3.3V      | VCC         | Logic Power Supply
-GND       | GND         | Ground
-VBAT      | VMOT        | Motor Power Supply (6-10.8V)
+
+Power and motors connect directly to the shim:
+
+```text
+Motor Shim   Function
+----------   -----------------------------------------
+VMOTOR       Motor supply input (per shim spec)
+MOTOR A +/-  Left motor terminals (connect to motor)
+MOTOR B +/-  Right motor terminals (connect to motor)
 ```
 
 ### Motor Connections
 
-Connect your DC motors to the motor output terminals:
-- **Motor A (Left)**: AO1 and AO2 terminals
-- **Motor B (Right)**: BO1 and BO2 terminals
+Connect your DC motors to the shim’s motor output terminals:
+
+- **Motor A (Left)**: MOTOR A +/−
+- **Motor B (Right)**: MOTOR B +/−
 
 **Motor Polarity**: If a motor spins in the wrong direction, swap the two wires for that motor.
 
@@ -40,10 +47,10 @@ Connect your DC motors to the motor output terminals:
 
 // Configure motor controller
 Exterminate::MotorController::Config config{};
-config.leftMotorPin1 = 3;    // GPIO 3 -> AIN1
-config.leftMotorPin2 = 2;    // GPIO 2 -> AIN2
-config.rightMotorPin1 = 4;   // GPIO 4 -> BIN1
-config.rightMotorPin2 = 5;   // GPIO 5 -> BIN2
+config.leftMotorPin1 = 6;    // GPIO 6 -> AIN1 (Motor Shim)
+config.leftMotorPin2 = 7;    // GPIO 7 -> AIN2 (Motor Shim)
+config.rightMotorPin1 = 27;  // GPIO 27 -> BIN1 (Motor Shim)
+config.rightMotorPin2 = 26;  // GPIO 26 -> BIN2 (Motor Shim)
 config.pwmFrequency = 20000; // 20 kHz PWM (default used in code)
 
 // Create motor controller instance
@@ -116,13 +123,9 @@ This allows:
 
 ## Safety Features
 
-### Current Limiting
+### Current and Thermal Considerations
 
-The DRV8833 includes built-in current limiting and thermal protection:
-
-- **Peak Current**: 2A per motor (brief)
-- **Continuous Current**: 1.2A per motor
-- **Thermal Shutdown**: Automatic at ~150°C
+Refer to the Pimoroni Motor Shim specifications for peak and continuous current limits and thermal behavior. Ensure your motors and supply are within ratings.
 
 ### Software Notes
 

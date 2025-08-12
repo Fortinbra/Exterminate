@@ -39,8 +39,8 @@ public:
         
         static Config getDefault() {
             return Config{
-                .dataPin = 9,          // GPIO 9 = I2S DOUT
-                .clockPinBase = 6,     // GPIO 6 = BCK, GPIO 7 = LRCLK (per documentation)
+                .dataPin = 34,         // GPIO 34 = I2S DOUT
+                .clockPinBase = 32,    // GPIO 32 = BCK, GPIO 33 = LRCLK
                 .sampleRate = 44100,   // Match our embedded audio files (they are 44.1kHz)
                 .bufferCount = 3,      // Triple buffering for smooth playback
                 .samplesPerBuffer = 256 // Small buffers for low latency

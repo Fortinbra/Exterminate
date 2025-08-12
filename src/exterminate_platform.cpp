@@ -57,13 +57,13 @@ static void exterminate_platform_init(int argc, const char** argv) {
     
     // Initialize motor controller
     // Configure for DRV8833 - adjust these pins according to your wiring
-    Exterminate::MotorController::Config motorConfig = {
-        .leftMotorPin1 = 2,    // GPIO2 - Left motor direction pin 1 (AIN1)
-        .leftMotorPin2 = 3,    // GPIO3 - Left motor direction pin 2 (AIN2)
-        .rightMotorPin1 = 4,   // GPIO4 - Right motor direction pin 1 (BIN1)
-        .rightMotorPin2 = 5,   // GPIO5 - Right motor direction pin 2 (BIN2)
-        .pwmFrequency = 10000  // 10kHz PWM frequency
-    };
+        Exterminate::MotorController::Config motorConfig = {
+            .leftMotorPin1 = 6,    // GPIO6 - Left motor AIN1 (Motor Shim)
+            .leftMotorPin2 = 7,    // GPIO7 - Left motor AIN2 (Motor Shim)
+            .rightMotorPin1 = 27,  // GPIO27 - Right motor BIN1 (Motor Shim)
+            .rightMotorPin2 = 26,  // GPIO26 - Right motor BIN2 (Motor Shim)
+            .pwmFrequency = 20000  // 20 kHz PWM (above audible range)
+        };
     
     motorController = new Exterminate::MotorController(motorConfig);
     
@@ -333,11 +333,11 @@ struct uni_platform* get_exterminate_platform(void) {
 Exterminate::AudioController* createAndInitializeAudioController() {
     logi("Creating audio controller with NEW Pico Extras I2S implementation:\n");
     
-    // Configure I2S audio system with updated pin layout
-    // Based on hardware configuration docs: GPIO 6=BCK, GPIO 7=LRCLK, GPIO 9=DOUT  
+    // Configure I2S audio system with updated pin layout on lower board pins
+    // Using: GPIO 32=BCK, GPIO 33=LRCLK, GPIO 34=DOUT
     Exterminate::AudioController::Config audioConfig = {
-        .dataPin = 9,              // I2S data output (DOUT) - GPIO 9
-        .clockPinBase = 6,         // I2S clock base (GPIO 6=BCK, GPIO 7=LRCLK)
+        .dataPin = 34,             // I2S data output (DOUT) - GPIO 34
+        .clockPinBase = 32,        // I2S clock base (GPIO 32=BCK, GPIO 33=LRCLK)
         .sampleRate = 44100,       // 44.1kHz audio (matches our embedded audio)
         .bufferCount = 3,          // Triple buffering
         .samplesPerBuffer = 256    // Small buffers for low latency

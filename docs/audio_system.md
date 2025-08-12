@@ -27,9 +27,9 @@ The audio pipeline leverages the Pico Extras `audio_i2s` driver, which manages I
 ```text
 GPIO Pin    I2S Signal    Function
 --------    ----------    --------
-GPIO 6      BCLK          Bit Clock base (clockPinBase)
-GPIO 7      LRCLK         Word Select (clockPinBase + 1)
-GPIO 9      DOUT          Audio Data Output (16‑bit PCM)
+GPIO 32     BCLK          Bit Clock base (clockPinBase)
+GPIO 33     LRCLK         Word Select (clockPinBase + 1)
+GPIO 34     DOUT          Audio Data Output (16‑bit PCM)
 ```
 
 **MAX98357A I2S Amplifier:**
@@ -91,11 +91,11 @@ Note: Ensure your conversion sample rate matches the runtime I2S sample rate. Th
 ### Basic Usage
 
 ```cpp
-// Initialize audio with Pico Extras I2S (defaults: dataPin=9, clockPinBase=6, sampleRate=44100)
+// Initialize audio with Pico Extras I2S (defaults: dataPin=34, clockPinBase=32, sampleRate=44100)
 AudioController::Config cfg = AudioController::Config::getDefault();
 // Optional: customize pins or sample rate
-// cfg.dataPin = 9;            // I2S DOUT
-// cfg.clockPinBase = 6;       // BCLK at 6, LRCLK at 7
+// cfg.dataPin = 34;           // I2S DOUT
+// cfg.clockPinBase = 32;      // BCLK at 32, LRCLK at 33
 // cfg.sampleRate = 44100;     // Must match converted PCM files
 
 AudioController audioController(cfg);
