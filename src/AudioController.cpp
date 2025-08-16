@@ -1,6 +1,8 @@
 #include "AudioController.h"
 #include "audio/audio_index.h"
 #include "pico/multicore.h"
+#include "hardware/dma.h"
+#include "hardware/pio.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -19,6 +21,8 @@ AudioController::AudioController(const Config& config)
     , bufferPool_(nullptr)
     , actualI2SFormat_(nullptr)
     , initialized_(false)
+    , pio_instance_(nullptr)
+    , pio_sm_(-1)
     , currentAudioData_(nullptr)
     , currentAudioSize_(0)
     , currentAudioPosition_(0)
@@ -56,18 +60,50 @@ bool AudioController::initialize() {
     printf("AudioController: Audio format - %uHz, %u channels, 16-bit PCM (mono files converted to stereo)\n", 
            audioFormat_.sample_freq, audioFormat_.channel_count);
 
+    // Auto-discover available DMA channel and PIO state machine
+    // The I2S library will claim these resources internally, so we just need to find available ones
+    int dma_channel = dma_claim_unused_channel(false);
+    if (dma_channel < 0) {
+        printf("AudioController: ERROR - No free DMA channels available\n");
+        return false;
+    }
+    dma_channel_unclaim(dma_channel);  // Unclaim so I2S library can claim it
+    printf("AudioController: Found available DMA channel %d\n", dma_channel);
+    
+    // Auto-discover available PIO state machine (try PIO1 first to avoid CYW43 conflicts)
+    int pio_sm = pio_claim_unused_sm(pio1, false);
+    printf("AudioController: pio_claim_unused_sm(pio1) returned SM %d\n", pio_sm);
+    if (pio_sm < 0) {
+        printf("AudioController: No free PIO state machines available on PIO1, trying PIO0...\n");
+        pio_sm = pio_claim_unused_sm(pio0, false);
+        printf("AudioController: pio_claim_unused_sm(pio0) returned SM %d\n", pio_sm);
+        if (pio_sm < 0) {
+            printf("AudioController: ERROR - No free PIO state machines available on either PIO\n");
+            return false;
+        }
+        printf("AudioController: Found available PIO0 SM %d\n", pio_sm);
+        pio_instance_ = pio0;
+        pio_sm_unclaim(pio0, pio_sm);  // Unclaim so I2S library can claim it
+    } else {
+        printf("AudioController: Found available PIO1 SM %d\n", pio_sm);
+        pio_instance_ = pio1;
+        pio_sm_unclaim(pio1, pio_sm);  // Unclaim so I2S library can claim it
+    }
+    pio_sm_ = pio_sm;
+    
     // Configure I2S pins
     i2sConfig_ = {
         .data_pin = config_.dataPin,
         .clock_pin_base = config_.clockPinBase,
-        .dma_channel = 0,  // Let the library choose
-        .pio_sm = 0        // Let the library choose
+        .dma_channel = (uint8_t)dma_channel,
+        .pio_sm = (uint8_t)pio_sm
     };
 
-    printf("AudioController: I2S config - data_pin=%u, clock_base=%u\n",
-           i2sConfig_.data_pin, i2sConfig_.clock_pin_base);
+    printf("AudioController: I2S config - data_pin=%u, clock_base=%u, dma_channel=%u, pio_sm=%u\n",
+           i2sConfig_.data_pin, i2sConfig_.clock_pin_base, i2sConfig_.dma_channel, i2sConfig_.pio_sm);
 
     // Initialize I2S first to get the actual format it will use
+    // The I2S library will claim the DMA channel and PIO SM internally
     const audio_format_t* actualFormat = audio_i2s_setup(&audioFormat_, &i2sConfig_);
     if (!actualFormat) {
         printf("AudioController: ERROR - Failed to setup I2S\n");

@@ -4,6 +4,7 @@
 #include "hardware/gpio.h"
 #include "hardware/pwm.h"
 #include "SimpleLED.h"
+#include <cmath>
 
 namespace Exterminate::SimpleLED {
 
@@ -110,6 +111,90 @@ void setBrightnessPin(unsigned int pin, float brightness) {
     if (brightness > 1.0f) brightness = 1.0f;
     uint16_t level = static_cast<uint16_t>(brightness * top);
     pwm_set_gpio_level(pin, level);
+}
+
+// LEDStatusController implementation
+bool LEDStatusController::initialize(unsigned int pin) {
+    m_pin = pin;
+    
+    // Initialize PWM for smooth breathing effects
+    if (!initializePwmPin(pin, 255, 4.0f)) {
+        return false;
+    }
+    
+    m_initialized = true;
+    m_currentStatus = LEDStatus::OFF;
+    m_lastUpdate = to_ms_since_boot(get_absolute_time());
+    m_brightness = 0.0f;
+    m_direction = true;
+    
+    // Start with LED off
+    setBrightnessPin(m_pin, 0.0f);
+    
+    return true;
+}
+
+void LEDStatusController::setStatus(LEDStatus status) {
+    if (!m_initialized) return;
+    
+    m_currentStatus = status;
+    m_lastUpdate = to_ms_since_boot(get_absolute_time());
+    
+    // Reset state variables for new pattern
+    switch (status) {
+        case LEDStatus::OFF:
+            setBrightnessPin(m_pin, 0.0f);
+            break;
+        case LEDStatus::ON:
+            setBrightnessPin(m_pin, 1.0f);
+            break;
+        case LEDStatus::BREATHING:
+        case LEDStatus::FAST_BLINK:
+        case LEDStatus::SLOW_BLINK:
+            m_brightness = 0.0f;
+            m_direction = true;
+            break;
+    }
+}
+
+void LEDStatusController::update() {
+    if (!m_initialized) return;
+    
+    uint32_t currentTime = to_ms_since_boot(get_absolute_time());
+    uint32_t elapsed = currentTime - m_lastUpdate;
+    
+    switch (m_currentStatus) {
+        case LEDStatus::OFF:
+        case LEDStatus::ON:
+            // Static states, nothing to update
+            break;
+            
+        case LEDStatus::BREATHING: {
+            // Breathing pattern - slow sine wave (4 second cycle)
+            const uint32_t BREATHING_PERIOD_MS = 4000;
+            float phase = (float)(currentTime % BREATHING_PERIOD_MS) / BREATHING_PERIOD_MS;
+            // Use sine wave for smooth breathing effect
+            m_brightness = 0.1f + 0.9f * (1.0f + sinf(2.0f * M_PI * phase)) / 2.0f;
+            setBrightnessPin(m_pin, m_brightness);
+            break;
+        }
+        
+        case LEDStatus::FAST_BLINK: {
+            // Fast blink - 200ms on, 200ms off
+            const uint32_t BLINK_PERIOD_MS = 400;
+            bool on = (currentTime % BLINK_PERIOD_MS) < (BLINK_PERIOD_MS / 2);
+            setBrightnessPin(m_pin, on ? 1.0f : 0.0f);
+            break;
+        }
+        
+        case LEDStatus::SLOW_BLINK: {
+            // Slow blink - 800ms on, 800ms off
+            const uint32_t BLINK_PERIOD_MS = 1600;
+            bool on = (currentTime % BLINK_PERIOD_MS) < (BLINK_PERIOD_MS / 2);
+            setBrightnessPin(m_pin, on ? 1.0f : 0.0f);
+            break;
+        }
+    }
 }
 
 } // namespace Exterminate::SimpleLED

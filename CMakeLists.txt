@@ -6,6 +6,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# BluePad32 configuration
+set(BLUEPAD32_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/bluepad32)
+set(BTSTACK_ROOT ${PICO_SDK_PATH}/lib/btstack)
+
 # Initialise pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
 
@@ -46,6 +50,7 @@ add_executable(Exterminate
     src/AudioIndex.cpp
     src/SimpleLED.cpp
     src/MotorController.cpp
+    src/GamepadController.cpp
 )
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
@@ -57,17 +62,27 @@ pico_enable_stdio_usb(Exterminate 0)
 # Add the standard library to the build
 target_link_libraries(Exterminate
         pico_stdlib
+        pico_cyw43_arch_none
+        pico_btstack_classic
+        pico_btstack_cyw43
+        hardware_pwm
         pico_audio_i2s
         pico_multicore
-        hardware_gpio
-        hardware_pwm)
+        bluepad32)
 
-# Link CYW43 arch only if available in this SDK install
-if (TARGET pico_cyw43_arch_none)
-    target_link_libraries(Exterminate pico_cyw43_arch_none)
-else()
-    message(STATUS "CYW43 arch not available in this SDK; building without WiFi/BT support.")
-endif()
+# Needed for btstack_config.h / sdkconfig.h
+# so that libbluepad32 can include them - MUST be before add_subdirectory
+include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
+
+# Need for BTstack headers
+include_directories(${BTSTACK_ROOT}/src)
+
+# Needed for btstack_config.h / sdkconfig.h
+# so that libbluepad32 can include them
+include_directories(src)
+
+# Add BluePad32 library 
+add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
 
 # Add the standard include files to the build
 target_include_directories(Exterminate PRIVATE
@@ -75,6 +90,7 @@ target_include_directories(Exterminate PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/include/audio
         ${CMAKE_CURRENT_LIST_DIR}/src
+        ${BLUEPAD32_ROOT}/src/components/bluepad32/include
 )
 
 pico_add_extra_outputs(Exterminate)

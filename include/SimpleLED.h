@@ -32,4 +32,40 @@ bool initializePwmPin(unsigned int pin, uint16_t wrap = 255, float clkdiv = 4.0f
 // Set PWM brightness (0.0 to 1.0) on a specific pin initialized with initializePwmPin
 void setBrightnessPin(unsigned int pin, float brightness);
 
+// LED Status patterns for system state indication
+enum class LEDStatus {
+    OFF,              // LED off
+    ON,               // LED solid on
+    BREATHING,        // Slow breathing pattern (pairing mode)
+    FAST_BLINK,       // Fast blinking (error state)
+    SLOW_BLINK        // Slow blinking (warning state)
+};
+
+// LED Status controller for automatic patterns
+class LEDStatusController {
+public:
+    // Initialize with specific pin (uses PWM for breathing effect)
+    bool initialize(unsigned int pin);
+    
+    // Set the LED status pattern
+    void setStatus(LEDStatus status);
+    
+    // Get current status
+    LEDStatus getStatus() const { return m_currentStatus; }
+    
+    // Update the LED pattern (call this regularly from main loop)
+    void update();
+    
+    // Check if initialized
+    bool isInitialized() const { return m_initialized; }
+
+private:
+    bool m_initialized = false;
+    unsigned int m_pin = 0;
+    LEDStatus m_currentStatus = LEDStatus::OFF;
+    uint32_t m_lastUpdate = 0;
+    float m_brightness = 0.0f;
+    bool m_direction = true; // For breathing pattern
+};
+
 }

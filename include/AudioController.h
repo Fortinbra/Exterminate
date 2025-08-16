@@ -3,6 +3,7 @@
 #include "audio/audio_index.h"
 #include "pico/audio_i2s.h"
 #include "pico/multicore.h"
+#include "hardware/pio.h"
 #include <cstdint>
 #include <memory>
 #include <atomic>
@@ -134,6 +135,13 @@ public:
     bool isPlaying() const { return getPlaybackState() == PlaybackState::Playing; }
 
     /**
+     * @brief Check if audio system is initialized
+     * 
+     * @return true if initialized
+     */
+    bool isInitialized() const { return initialized_; }
+
+    /**
      * @brief Get current audio intensity for LED effects
      * 
      * @return float Normalized intensity (0.0 to 1.0)
@@ -155,6 +163,10 @@ private:
     audio_buffer_format_t bufferFormat_;      // Persistent producer buffer format
     audio_i2s_config_t i2sConfig_;
     bool initialized_;
+    
+    // Hardware resource tracking
+    PIO pio_instance_;  // Track which PIO instance we're using
+    int pio_sm_;        // Track which state machine we're using
     
     // Current audio data
     const int16_t* currentAudioData_;

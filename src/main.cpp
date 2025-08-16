@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include "pico/stdlib.h"
+#include "GamepadController.h"
 #include "AudioController.h"
 #include "SimpleLED.h"
 #include "MotorController.h"
@@ -20,6 +21,7 @@
 #endif
 
 using namespace Exterminate;
+using namespace Exterminate::SimpleLED;
 
 int main() {
     stdio_init_all();
@@ -27,11 +29,39 @@ int main() {
     // Small delay for system initialization
     sleep_ms(1000);
     
-    printf("Exterminate Audio Test Starting...\n");
+    printf("===========================================\n");
+    printf("Exterminate Dalek - Full System Starting\n");
+    printf("===========================================\n");
     
-    // Initialize and test audio
+    // Initialize LED status controller for blue eye stalk LED
+    LEDStatusController eyeLED;
+    const unsigned int BLUE_LED_PIN = 15; // Blue LED for eye stalk status
+    
+    if (eyeLED.initialize(BLUE_LED_PIN)) {
+        printf("Blue eye LED initialized on GPIO %u\n", BLUE_LED_PIN);
+    } else {
+        printf("WARNING: Failed to initialize blue eye LED on GPIO %u\n", BLUE_LED_PIN);
+        printf("Continuing without LED status indication...\n");
+    }
+    
+    // Initialize gamepad controller first
+    GamepadController& gamepadController = GamepadController::getInstance();
+    
+    // Set the LED controller for automatic status updates
+    if (eyeLED.isInitialized()) {
+        gamepadController.setLEDController(&eyeLED);
+    }
+    
+    if (!gamepadController.initialize()) {
+        printf("ERROR: Failed to initialize gamepad controller!\n");
+        printf("Make sure you're using a Pico W board with Bluetooth support.\n");
+        return -1;
+    }
+    
+    printf("GamepadController initialized successfully.\n");
+    
+    // Initialize and test audio system
     AudioController audio;
-    
     if (audio.initialize()) {
         printf("Audio initialized successfully\n");
         
@@ -39,6 +69,7 @@ int main() {
         printf("Playing boot sound...\n");
         if (audio.playAudio(Audio::AudioIndex::AUDIO_00001)) {
             printf("Boot sound started successfully\n");
+            
             // Two external LEDs driven by audio intensity via PWM (skip onboard LED)
             const unsigned extLedPins[] = {11, 12};
             bool pwmOk[2] = {false, false};
@@ -77,32 +108,14 @@ int main() {
         } else {
             printf("Failed to start boot sound\n");
         }
-        
-    // Let the sound play for a few seconds
-    sleep_ms(5000);
-        
-        printf("Audio test complete\n");
     } else {
         printf("Audio initialization failed!\n");
     }
     
-    // Minimal cyw43 init to validate board setup (no background thread)
-#if EX_HAS_CYW43
-    if (cyw43_arch_init()) {
-        printf("cyw43 init failed (expected if no module)") ;
-    } else {
-        printf("cyw43 init ok\n");
-        cyw43_arch_deinit();
-    }
-#else
-    printf("CYW43 headers not available at build time; skipping init.\n");
-#endif
-
-    // Initialize DRV8833 motor controller and spin motors at startup
+    // Initialize DRV8833 motor controller
     using Exterminate::MotorController;
     
     // If your DRV8833 breakout has nSLEEP, you can optionally define DRV8833_SLEEP_PIN
-    // at compile time to drive it HIGH here. Otherwise, tie nSLEEP to VM on hardware.
     #ifdef DRV8833_SLEEP_PIN
     {
         const uint SLP = DRV8833_SLEEP_PIN;
@@ -122,18 +135,42 @@ int main() {
     };
     static MotorController motors(mc);
     if (motors.initialize()) {
-        printf("Motor controller initialized. Spinning both motors full forward.\n");
-        motors.setMotorSpeed(MotorController::Motor::LEFT, 1.0f);
-        motors.setMotorSpeed(MotorController::Motor::RIGHT, 1.0f);
+        printf("Motor controller initialized successfully.\n");
+        // Don't start motors immediately - wait for gamepad input
+        printf("Motors ready for gamepad control.\n");
     } else {
         printf("Motor controller initialization failed.\n");
     }
     
-    // Main loop - just keep the program running
-    printf("Entering main loop...\n");
-    while (true) {
-        sleep_ms(1000);
-    }
+    printf("\n");
+    printf("===========================================\n");
+    printf("System Status:\n");
+    printf("- Blue Eye LED: %s\n", eyeLED.isInitialized() ? "Active (breathing = pairing mode)" : "Disabled");
+    printf("- Audio System: %s\n", audio.isInitialized() ? "Ready" : "Failed");
+    printf("- Motor Control: %s\n", motors.isInitialized() ? "Ready" : "Failed");
+    printf("- Gamepad Controller: Ready for connections\n");
+    printf("\n");
+    printf("LED Status Indicators:\n");
+    printf("- Breathing: Pairing mode (ready for connections)\n");
+    printf("- Solid: Controller paired and ready\n");
+    printf("- Fast blink: Error state\n");
+    printf("- Slow blink: Initializing or connecting\n");
+    printf("\n");
+    printf("Instructions:\n");
+    printf("1. Put your gamepad into pairing mode\n");
+    printf("2. All gamepad inputs will be logged to this UART console\n");
+    printf("3. Use gamepad controls to operate motors and audio\n");
+    printf("4. Use Ctrl+C to stop the program if needed\n");
+    printf("\n");
+    printf("Starting BluePad32 event loop...\n");
+    printf("LED updates and system operation handled automatically.\n");
+    printf("===========================================\n");
     
+    // Start the gamepad event loop (this blocks and doesn't return)
+    // All LED updates, audio, and motor control are handled via callbacks
+    gamepadController.startEventLoop();
+    
+    // This line should never be reached
+    printf("Event loop ended unexpectedly!\n");
     return 0;
 }
