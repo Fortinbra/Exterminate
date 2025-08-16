@@ -1,8 +1,10 @@
 #include "GamepadController.h"
+#include "MotorController.h"
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
 #include <cstring>
+#include <cmath>
 
 extern "C" {
     #include "sdkconfig.h"
@@ -83,6 +85,15 @@ void GamepadController::startEventLoop() {
 void GamepadController::setLEDController(SimpleLED::LEDStatusController* ledController) {
     m_ledController = ledController;
     updateLEDStatus(); // Update LED immediately when controller is set
+}
+
+void GamepadController::setMotorController(MotorController* motorController) {
+    m_motorController = motorController;
+    if (m_motorController) {
+        printf("GamepadController: Motor controller connected for tank steering\n");
+        printf("DEBUG: Motor controller initialized: %s\n", 
+               m_motorController->isInitialized() ? "YES" : "NO");
+    }
 }
 
 void GamepadController::updateLEDStatus() {
@@ -193,8 +204,16 @@ uni_error_t GamepadController::platformOnDeviceReady(uni_hid_device_t* d) {
 }
 
 void GamepadController::platformOnControllerData(uni_hid_device_t* d, uni_controller_t* ctl) {
+    // Get the singleton instance to access member variables
+    GamepadController& instance = getInstance();
+    
     // Log all controller data to UART console
     logControllerData(d, ctl);
+    
+    // Process tank steering if we have a gamepad and motor controller
+    if (ctl->klass == UNI_CONTROLLER_CLASS_GAMEPAD && instance.m_motorController) {
+        instance.processTankSteering(&ctl->gamepad);
+    }
 }
 
 const uni_property_t* GamepadController::platformGetProperty(uni_property_idx_t idx) {
@@ -308,6 +327,62 @@ void GamepadController::logGamepadData(uni_hid_device_t* d, const uni_gamepad_t*
     }
 
     printf("\n");
+}
+
+void GamepadController::processTankSteering(const uni_gamepad_t* gp) {
+    if (!m_motorController) {
+        printf("DEBUG: No motor controller set!\n");
+        return;
+    }
+    
+    if (!m_motorController->isInitialized()) {
+        printf("DEBUG: Motor controller not initialized!\n");
+        return;
+    }
+    
+    // Tank steering using left analog stick
+    // Y-axis controls throttle (forward/reverse)
+    // X-axis controls steering (left/right turn)
+    
+    // Convert from BluePad32's axis range to normalized values
+    // BluePad32 uses signed 16-bit values (-512 to 511 typically)
+    static constexpr float AXIS_SCALE = 1.0f / 512.0f;
+    static constexpr int16_t DEADZONE = 50;  // Deadzone to prevent drift
+    
+    // Get raw axis values
+    int16_t rawThrottle = gp->axis_y;  // Y-axis for forward/backward
+    int16_t rawSteering = gp->axis_x;  // X-axis for left/right
+    
+    // Debug: Always print raw values to see what we're getting
+    static int debugCounter = 0;
+    if (debugCounter++ % 50 == 0) { // Print every 50 calls to avoid spam
+        printf("DEBUG: Raw stick values - X=%d Y=%d\n", rawSteering, rawThrottle);
+    }
+    
+    // Apply deadzone
+    int16_t throttle = (abs(rawThrottle) > DEADZONE) ? rawThrottle : 0;
+    int16_t steering = (abs(rawSteering) > DEADZONE) ? rawSteering : 0;
+    
+    // Convert to normalized values (-1.0 to 1.0)
+    float normalizedThrottle = static_cast<float>(throttle) * AXIS_SCALE;
+    float normalizedSteering = static_cast<float>(steering) * AXIS_SCALE;
+    
+    // Invert Y-axis since gamepad Y is typically inverted
+    // (up on stick should be forward motion)
+    normalizedThrottle = -normalizedThrottle;
+    
+    // Clamp to valid range
+    normalizedThrottle = std::max(-1.0f, std::min(1.0f, normalizedThrottle));
+    normalizedSteering = std::max(-1.0f, std::min(1.0f, normalizedSteering));
+    
+    // Apply tank steering to motors
+    m_motorController->setDifferentialDrive(normalizedThrottle, normalizedSteering);
+    
+    // Optional: Log motor commands when there's significant input
+    if (abs(throttle) > DEADZONE || abs(steering) > DEADZONE) {
+        printf("TankSteering: Raw(X=%d,Y=%d) -> Throttle=%.2f Steering=%.2f\n", 
+               rawSteering, rawThrottle, normalizedThrottle, normalizedSteering);
+    }
 }
 
 } // namespace Exterminate

@@ -9,6 +9,9 @@ extern "C" {
 
 namespace Exterminate {
 
+// Forward declaration
+class MotorController;
+
 /**
  * @brief Bluetooth connection states for LED status indication
  */
@@ -60,6 +63,12 @@ public:
     void setLEDController(SimpleLED::LEDStatusController* ledController);
 
     /**
+     * @brief Set the motor controller for tank-style steering
+     * @param motorController Pointer to motor controller (nullptr to disable)
+     */
+    void setMotorController(MotorController* motorController);
+
+    /**
      * @brief Get the singleton instance
      * @return Reference to the singleton instance
      */
@@ -76,6 +85,7 @@ private:
     bool m_initialized = false;
     BluetoothState m_bluetoothState = BluetoothState::INITIALIZING;
     SimpleLED::LEDStatusController* m_ledController = nullptr;
+    MotorController* m_motorController = nullptr;
 
     // C callback functions that interface with BluePad32
     static void platformInit(int argc, const char** argv);
@@ -91,6 +101,7 @@ private:
     // Helper methods
     static void logGamepadData(uni_hid_device_t* d, const uni_gamepad_t* gp);
     static void logControllerData(uni_hid_device_t* d, uni_controller_t* ctl);
+    void processTankSteering(const uni_gamepad_t* gp);
     
     // LED status management
     void updateLEDStatus();

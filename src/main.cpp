@@ -71,7 +71,9 @@ int main() {
             printf("Boot sound started successfully\n");
             
             // Two external LEDs driven by audio intensity via PWM (skip onboard LED)
-            const unsigned extLedPins[] = {11, 12};
+            // Changed from GPIO 11,12 to GPIO 18,19 to avoid PWM conflicts with motors
+            // GPIO 11 shares PWM channel 5B with GPIO 27 (motor pin), causing interference
+            const unsigned extLedPins[] = {18, 19};
             bool pwmOk[2] = {false, false};
             for (int i = 0; i < 2; ++i) {
                 pwmOk[i] = Exterminate::SimpleLED::initializePwmPin(extLedPins[i], /*wrap*/255, /*clkdiv*/4.0f);
@@ -127,17 +129,26 @@ int main() {
     #endif
 
     static MotorController::Config mc{
-        /*leftMotorPin1 (AIN1)*/ 3, // swapped to match wiring: GPIO3 -> AIN1
-        /*leftMotorPin2 (AIN2)*/ 2, // swapped to match wiring: GPIO2 -> AIN2
-        /*rightMotorPin1*/ 4,
-        /*rightMotorPin2*/ 5,
+        /*leftMotorPin1 (AIN1)*/ 7,  // Hardware wiring: GPIO7 -> AIN1
+        /*leftMotorPin2 (AIN2)*/ 6,  // Hardware wiring: GPIO6 -> AIN2
+        /*rightMotorPin1 (BIN1)*/ 26, // Hardware wiring: GPIO26 -> BIN1
+        /*rightMotorPin2 (BIN2)*/ 27, // Hardware wiring: GPIO27 -> BIN2
         /*pwmFrequency*/ 20000
     };
     static MotorController motors(mc);
     if (motors.initialize()) {
         printf("Motor controller initialized successfully.\n");
-        // Don't start motors immediately - wait for gamepad input
-        printf("Motors ready for gamepad control.\n");
+        
+        // Quick motor test - brief forward motion to verify motors work
+        printf("Testing motors briefly...\n");
+        motors.setDifferentialDrive(0.3f, 0.0f);  // 30% forward
+        sleep_ms(500);  // Run for 500ms
+        motors.stopAllMotors();  // Stop
+        printf("Motor test completed.\n");
+        
+        // Connect motor controller to gamepad for tank steering
+        gamepadController.setMotorController(&motors);
+        printf("Tank steering enabled - use left analog stick to drive!\n");
     } else {
         printf("Motor controller initialization failed.\n");
     }
@@ -159,8 +170,11 @@ int main() {
     printf("Instructions:\n");
     printf("1. Put your gamepad into pairing mode\n");
     printf("2. All gamepad inputs will be logged to this UART console\n");
-    printf("3. Use gamepad controls to operate motors and audio\n");
-    printf("4. Use Ctrl+C to stop the program if needed\n");
+    printf("3. Tank Steering Controls:\n");
+    printf("   - Left Analog Stick Y-axis: Forward/Reverse throttle\n");
+    printf("   - Left Analog Stick X-axis: Left/Right steering\n");
+    printf("4. Use other gamepad controls to operate audio\n");
+    printf("5. Use Ctrl+C to stop the program if needed\n");
     printf("\n");
     printf("Starting BluePad32 event loop...\n");
     printf("LED updates and system operation handled automatically.\n");
