@@ -24,7 +24,7 @@ Exterminate is an animatronic Dalek control system that enables wireless gamepad
 - **Differential Drive Control**: Sophisticated two-wheel movement with forward/reverse and turning
 - **DRV8833 Motor Driver**: High-efficiency dual H-bridge motor control with PWM speed regulation
 - **Servo Eye Stalk Control**: Precise servo motor control for authentic Dalek eye movement
-- **PIO-Based I2S Audio**: High-quality 22.05kHz PCM audio output using custom PIO state machines
+- **PIO-Based I2S Audio**: High-quality 44.1kHz PCM audio output using pico-extras I2S library
 - **Audio-Reactive LEDs**: Real-time LED visualization that pulses with audio intensity for authentic Dalek head lighting
 - **Controller Status LED**: Visual feedback showing controller connection status (solid when paired, flashing when waiting)
 - **Modern C++17**: Clean, maintainable code following SOLID principles and RAII patterns
@@ -235,22 +235,15 @@ The project follows **SOLID principles** and modern C++ best practices:
 
 #### `AudioController`
 
-- **Purpose**: PIO-based I2S audio output with LED integration
-- **Features**: 22.05kHz PCM audio playback, real-time audio intensity calculation, LED synchronization
-- **Interface**: `playAudio()`, `stopAudio()`, `getAudioIntensity()`, LED integration methods
+- **Purpose**: Pico-extras I2S audio output with LED integration
+- **Features**: 44.1kHz PCM audio playback, real-time audio intensity calculation, LED synchronization, resource discovery pattern
+- **Interface**: `playAudio()`, `stopAudio()`, `getAudioIntensity()`, `initialize()` methods
 
 #### `SimpleLED`
 
 - **Purpose**: Lightweight PWM helper for external LEDs
 - **Features**: Pin init, PWM init, and brightness setting; audio-driven updates done in `main.cpp`
 - **Interface**: `initializePwmPin()`, `setBrightnessPin()`
-
-#### `I2S`
-
-- **Purpose**: Hardware abstraction for PIO-based I2S audio output
-- **Features**: Custom PIO state machines, DMA double-buffering, configurable sample rates, RAII design
-- **Interface**: `configure()`, `start()`, `stop()`, `writeAudio()`, interrupt handling
-- **Based on**: [malacalypse/rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) PIO implementation
 
 #### `exterminate_platform`
 
@@ -263,7 +256,7 @@ The project follows **SOLID principles** and modern C++ best practices:
 ```text
 Gamepad Input → BluePad32 → Platform Handler → Motor Controller → Drive Motors (Movement)
                                             └→ Servo Controller → Eye Stalk Movement  
-                                            └→ Audio Controller → I2S PIO → Speaker
+                                            └→ Audio Controller → Pico-Extras I2S → Speaker
                                             └→ LED Controller → PWM LEDs → Audio Visualization
                                             └→ Status LED → Controller Connection Feedback
 ```
@@ -399,6 +392,12 @@ While embedded testing is complex, the modular design supports unit testing:
    - Ensure C++17 standard is enabled
    - Check include paths for BluePad32
    - Verify btstack configuration files
+
+7. **DMA Channel Conflicts** (Critical Fix Applied):
+   - **Symptoms**: Runtime panic "DMA channel X is already claimed", LED staying solid, gamepad not pairing
+   - **Root Cause**: Pico-extras I2S library expects to manage its own resources internally
+   - **Solution**: Resource discovery pattern implemented in AudioController::initialize()
+   - **Reference**: See `docs/troubleshooting_dma_conflicts.md` for detailed explanation
 
 ### Debug Output
 

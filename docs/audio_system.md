@@ -18,9 +18,35 @@ The audio system consists of three main components:
 
 The audio pipeline leverages the Pico Extras `audio_i2s` driver, which manages I2S clocks, DMA, and buffer queues:
 
-- Pico Extras `audio_i2s`: provides BCLK/LRCLK and streams PCM via DMA
-- Producer buffer pool: triple‑buffered for smooth playback
-- Default sample rate: 44.1 kHz (matches converted PCM files)
+- **Pico Extras `audio_i2s`**: Provides BCLK/LRCLK and streams PCM via DMA
+- **Producer buffer pool**: Triple‑buffered for smooth playback
+- **Default sample rate**: 44.1 kHz (matches converted PCM files)
+- **Resource Discovery Pattern**: Finds available DMA channels and PIO state machines without conflicts
+
+### Resource Management
+
+**Critical Implementation Detail**: The system uses a resource discovery pattern to avoid DMA channel conflicts with the pico-extras I2S library:
+
+```cpp
+// Find available resources without permanently claiming them
+int dma_channel = dma_claim_unused_channel(false);  // false = don't claim permanently
+uint pio_sm = pio_claim_unused_sm(pio, false);      // false = don't claim permanently
+
+// Immediately release for the I2S library to claim internally
+dma_channel_unclaim(dma_channel);
+pio_sm_unclaim(pio, pio_sm);
+
+// Let pico-extras library manage resources internally
+audio_i2s_config_t config = {
+    .data_pin = discovered_data_pin,
+    .clock_pin_base = discovered_clock_base,
+    .dma_channel = dma_channel,
+    .pio_sm = pio_sm
+};
+audio_i2s_setup(&format, &config);
+```
+
+**Why This Approach?**: The pico-extras I2S library expects to manage its own DMA channels and PIO state machines internally. Pre-claiming these resources causes runtime panics like "DMA channel X is already claimed".
 
 ### Hardware Configuration
 
@@ -39,7 +65,7 @@ GPIO 34     DOUT          Audio Data Output (16‑bit PCM)
 - **Gain**: Fixed at 9dB when GAIN pin tied to GND
 - **Efficiency**: High efficiency Class D amplifier design
 
-No custom PIO assembly is required; the Pico Extras library configures PIO and DMA under the hood.
+**Library Integration**: The pico-extras library automatically configures PIO and DMA resources. No custom PIO assembly is required.
 
 ## Embedded Audio Conversion (to PCM)
 

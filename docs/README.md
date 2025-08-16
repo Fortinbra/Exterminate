@@ -79,6 +79,13 @@ This documentation provides comprehensive information for building, programming,
 - Debugging techniques and profiling tools
 - Testing strategies and continuous integration
 
+**[Troubleshooting: DMA Conflicts](troubleshooting_dma_conflicts.md)** - Critical system fixes
+
+- Resolution for "DMA channel already claimed" runtime panics
+- LED staying solid and gamepad pairing issues  
+- Resource discovery pattern implementation
+- Prevention strategies for library integration conflicts
+
 ## Documentation Structure
 
 ### By Experience Level

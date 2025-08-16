@@ -398,6 +398,32 @@ TEST(MotorController, SpeedClamping) {
 
 ### Runtime Issues
 
+**DMA Channel Conflicts** (Fixed):
+```
+Runtime panic: "DMA channel X is already claimed"
+```
+**Root Cause**: Pico-extras I2S library expects to manage its own DMA channels internally.
+
+**Solution**: Use resource discovery pattern in `AudioController::initialize()`:
+```cpp
+// DON'T: Pre-claim resources permanently
+// int dma_channel = dma_claim_unused_channel(true);  // ❌ Causes conflicts
+
+// DO: Discover available resources, then let library claim them
+int dma_channel = dma_claim_unused_channel(false);   // ✅ Just find available
+dma_channel_unclaim(dma_channel);                    // ✅ Release immediately
+// Library claims internally during audio_i2s_setup()
+```
+
+**LED Staying Solid Instead of Breathing**:
+- Symptom of DMA channel conflicts preventing proper system initialization
+- Fixed by implementing resource discovery pattern above
+
+**Gamepad Not Pairing**:
+- Often caused by resource conflicts blocking BluePad32 initialization  
+- Verify DMA channels are available for Bluetooth subsystem
+- Check for "controller not pairing" messages in debug output
+
 **System Won't Boot**:
 1. Verify power supply and connections
 2. Check for flash corruption
