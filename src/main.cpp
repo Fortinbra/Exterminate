@@ -35,7 +35,9 @@ int main() {
     
     // Initialize LED status controller for blue eye stalk LED
     LEDStatusController eyeLED;
-    const unsigned int BLUE_LED_PIN = 15; // Blue LED for eye stalk status
+    // Relocated to a higher GPIO (bottom edge exposed) per hardware mounting requirement.
+    // Choose a pin in the 35-47 range that is free (adjust if conflicts arise).
+    const unsigned int BLUE_LED_PIN = 36; // Blue LED for eye stalk status (was 15 -> 40 -> 36)
     
     if (eyeLED.initialize(BLUE_LED_PIN)) {
         printf("Blue eye LED initialized on GPIO %u\n", BLUE_LED_PIN);
@@ -57,7 +59,7 @@ int main() {
         printf("Make sure you're using a Pico W board with Bluetooth support.\n");
         return -1;
     }
-    
+
     printf("GamepadController initialized successfully.\n");
     
     // Initialize and test audio system
@@ -65,22 +67,26 @@ int main() {
     if (audio.initialize()) {
         printf("Audio initialized successfully\n");
         
+        // Set the audio controller for gamepad button controls after audio init
+        gamepadController.setAudioController(&audio);
+        
         // Play boot sound
         printf("Playing boot sound...\n");
         if (audio.playAudio(Audio::AudioIndex::AUDIO_00001)) {
             printf("Boot sound started successfully\n");
             
             // Two external LEDs driven by audio intensity via PWM (skip onboard LED)
-            // Changed from GPIO 11,12 to GPIO 18,19 to avoid PWM conflicts with motors
-            // GPIO 11 shares PWM channel 5B with GPIO 27 (motor pin), causing interference
-            const unsigned extLedPins[] = {18, 19};
+            // Moved to higher GPIO range (35-47) to avoid mechanical blockage and wiring congestion.
+            const unsigned extLedPins[] = {37, 38}; // Red audio LEDs (were 11,12 -> 18,19 -> 41,42 -> 37,38)
             bool pwmOk[2] = {false, false};
             for (int i = 0; i < 2; ++i) {
                 pwmOk[i] = Exterminate::SimpleLED::initializePwmPin(extLedPins[i], /*wrap*/255, /*clkdiv*/4.0f);
                 printf("External LED on GPIO %u %s\n", extLedPins[i], pwmOk[i] ? "initialized with PWM." : "failed PWM init!");
             }
 
-            if (pwmOk[0] || pwmOk[1]) {
+            bool redLedsWorking = (pwmOk[0] || pwmOk[1]);
+
+            if (redLedsWorking) {
                 // Periodically update LED brightness from audio intensity
                 static repeating_timer_t ledTimer;
                 struct LedTimerCtx { Exterminate::AudioController* audio; unsigned pins[2]; int count; float displayLevel; };
@@ -89,6 +95,8 @@ int main() {
                     auto* c = static_cast<LedTimerCtx*>(rt->user_data);
                     float intensity = 0.0f;
                     if (c && c->audio) {
+                        // Apply natural decay to audio intensity for LED effects
+                        c->audio->decayAudioIntensity();
                         intensity = c->audio->getAudioIntensity();
                     }
                     // Increase contrast: deadzone + gamma + peak hold
@@ -104,9 +112,13 @@ int main() {
                     }
                     return true; // keep repeating
                 }, &ctx, &ledTimer);
+                printf("Red LEDs configured to react to audio intensity\n");
             } else {
                 printf("No external LEDs initialized. Check pins/wiring.\n");
             }
+            
+            // Store LED status for later reporting
+            static bool s_redLedsWorking = redLedsWorking;
         } else {
             printf("Failed to start boot sound\n");
         }
@@ -114,10 +126,12 @@ int main() {
         printf("Audio initialization failed!\n");
     }
     
+    // Motor controller disabled due to hardware issues
     // Initialize DRV8833 motor controller
-    using Exterminate::MotorController;
+    // using Exterminate::MotorController;
     
     // If your DRV8833 breakout has nSLEEP, you can optionally define DRV8833_SLEEP_PIN
+    /*
     #ifdef DRV8833_SLEEP_PIN
     {
         const uint SLP = DRV8833_SLEEP_PIN;
@@ -129,11 +143,11 @@ int main() {
     #endif
 
     static MotorController::Config mc{
-        /*leftMotorPin1 (AIN1)*/ 7,  // Hardware wiring: GPIO7 -> AIN1
-        /*leftMotorPin2 (AIN2)*/ 6,  // Hardware wiring: GPIO6 -> AIN2
-        /*rightMotorPin1 (BIN1)*/ 26, // Hardware wiring: GPIO26 -> BIN1
-        /*rightMotorPin2 (BIN2)*/ 27, // Hardware wiring: GPIO27 -> BIN2
-        /*pwmFrequency*/ 20000
+        // leftMotorPin1 (AIN1) // 7,  // Hardware wiring: GPIO7 -> AIN1
+        // leftMotorPin2 (AIN2) // 6,  // Hardware wiring: GPIO6 -> AIN2
+        // rightMotorPin1 (BIN1) // 26, // Hardware wiring: GPIO26 -> BIN1
+        // rightMotorPin2 (BIN2) // 27, // Hardware wiring: GPIO27 -> BIN2
+        // pwmFrequency // 20000
     };
     static MotorController motors(mc);
     if (motors.initialize()) {
@@ -152,29 +166,32 @@ int main() {
     } else {
         printf("Motor controller initialization failed.\n");
     }
+    */
+    printf("Motor controller disabled due to hardware issues.\n");
     
     printf("\n");
     printf("===========================================\n");
     printf("System Status:\n");
     printf("- Blue Eye LED: %s\n", eyeLED.isInitialized() ? "Active (breathing = pairing mode)" : "Disabled");
+    printf("- Red Audio LEDs: %s\n", audio.isInitialized() ? "Active (react to audio)" : "Disabled");
     printf("- Audio System: %s\n", audio.isInitialized() ? "Ready" : "Failed");
-    printf("- Motor Control: %s\n", motors.isInitialized() ? "Ready" : "Failed");
+    printf("- Motor Control: Disabled (hardware issues)\n");
     printf("- Gamepad Controller: Ready for connections\n");
     printf("\n");
     printf("LED Status Indicators:\n");
-    printf("- Breathing: Pairing mode (ready for connections)\n");
-    printf("- Solid: Controller paired and ready\n");
-    printf("- Fast blink: Error state\n");
-    printf("- Slow blink: Initializing or connecting\n");
+    printf("- Blue LED Breathing: Pairing mode (ready for connections)\n");
+    printf("- Blue LED Solid: Controller paired and ready\n");
+    printf("- Blue LED Fast blink: Error state\n");
+    printf("- Blue LED Slow blink: Initializing or connecting\n");
+    printf("- Red LEDs: Brightness follows audio intensity\n");
     printf("\n");
     printf("Instructions:\n");
     printf("1. Put your gamepad into pairing mode\n");
     printf("2. All gamepad inputs will be logged to this UART console\n");
-    printf("3. Tank Steering Controls:\n");
-    printf("   - Left Analog Stick Y-axis: Forward/Reverse throttle\n");
-    printf("   - Left Analog Stick X-axis: Left/Right steering\n");
-    printf("4. Use other gamepad controls to operate audio\n");
-    printf("5. Use Ctrl+C to stop the program if needed\n");
+    printf("3. Audio Controls:\n");
+    printf("   - A Button: Trigger sound bite\n");
+    printf("   - Red LEDs will react to audio playback\n");
+    printf("4. Use Ctrl+C to stop the program if needed\n");
     printf("\n");
     printf("Starting BluePad32 event loop...\n");
     printf("LED updates and system operation handled automatically.\n");

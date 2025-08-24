@@ -2,7 +2,7 @@
 
 #include "audio/audio_index.h"
 #include "pico/audio_i2s.h"
-#include "pico/multicore.h"
+#include "pico/time.h"
 #include "hardware/pio.h"
 #include <cstdint>
 #include <memory>
@@ -86,6 +86,13 @@ public:
     bool playAudio(Audio::AudioIndex audioIndex);
 
     /**
+     * @brief Play a random audio file from available audio files
+     * 
+     * @return true if playback started
+     */
+    bool playRandomAudio();
+
+    /**
      * @brief Stop current audio playback
      * 
      * @return true if stopped successfully
@@ -148,6 +155,19 @@ public:
      */
     float getAudioIntensity() const { return audioIntensity_.load(); }
 
+    /**
+     * @brief Apply natural decay to audio intensity (for LED effects)
+     * Call this periodically to make LED effects fade out
+     */
+    void decayAudioIntensity() { 
+        float current = audioIntensity_.load();
+        if (current > 0.01f) {
+            audioIntensity_ = current * 0.92f;  // Natural decay
+        } else {
+            audioIntensity_ = 0.0f;  // Snap to zero when very low
+        }
+    }
+
 private:
     Config config_;
     
@@ -167,6 +187,12 @@ private:
     // Hardware resource tracking
     PIO pio_instance_;  // Track which PIO instance we're using
     int pio_sm_;        // Track which state machine we're using
+    
+    // Timer-based audio streaming
+    repeating_timer_t audioStreamingTimer_;
+    
+    // Timer for audio worker instead of multicore
+    repeating_timer_t audioWorkerTimer_;
     
     // Current audio data
     const int16_t* currentAudioData_;
@@ -192,6 +218,11 @@ private:
     size_t fillAudioBuffer(audio_buffer_t* buffer);
     
     /**
+     * @brief Start timer-based audio streaming (single-core alternative to multicore)
+     */
+    void startTimerBasedAudioStreaming();
+    
+    /**
      * @brief Calculate audio intensity for LED effects
      * 
      * @param samples PCM samples to analyze
@@ -200,9 +231,9 @@ private:
     void updateAudioIntensity(const int16_t* samples, size_t sampleCount);
     
     /**
-     * @brief Start the audio worker on core 1
+     * @brief Timer-based audio worker disabled due to multicore conflicts
      */
-    void startAudioWorker();
+    // void startAudioWorkerTimer(); // DISABLED
 };
 
 } // namespace Exterminate

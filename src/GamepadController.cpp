@@ -1,5 +1,6 @@
 #include "GamepadController.h"
 #include "MotorController.h"
+#include "AudioController.h"
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
@@ -93,6 +94,15 @@ void GamepadController::setMotorController(MotorController* motorController) {
         printf("GamepadController: Motor controller connected for tank steering\n");
         printf("DEBUG: Motor controller initialized: %s\n", 
                m_motorController->isInitialized() ? "YES" : "NO");
+    }
+}
+
+void GamepadController::setAudioController(AudioController* audioController) {
+    m_audioController = audioController;
+    if (m_audioController) {
+        printf("GamepadController: Audio controller connected for sound effects\n");
+        printf("DEBUG: Audio controller initialized: %s\n", 
+               m_audioController->isInitialized() ? "YES" : "NO");
     }
 }
 
@@ -210,9 +220,17 @@ void GamepadController::platformOnControllerData(uni_hid_device_t* d, uni_contro
     // Log all controller data to UART console
     logControllerData(d, ctl);
     
-    // Process tank steering if we have a gamepad and motor controller
-    if (ctl->klass == UNI_CONTROLLER_CLASS_GAMEPAD && instance.m_motorController) {
-        instance.processTankSteering(&ctl->gamepad);
+    // Process gamepad controls if we have a gamepad
+    if (ctl->klass == UNI_CONTROLLER_CLASS_GAMEPAD) {
+        // Process audio controls (A button for sound effects)
+        if (instance.m_audioController) {
+            instance.processAudioControls(&ctl->gamepad);
+        }
+        
+        // Process tank steering if we have a motor controller
+        if (instance.m_motorController) {
+            instance.processTankSteering(&ctl->gamepad);
+        }
     }
 }
 
@@ -383,6 +401,43 @@ void GamepadController::processTankSteering(const uni_gamepad_t* gp) {
         printf("TankSteering: Raw(X=%d,Y=%d) -> Throttle=%.2f Steering=%.2f\n", 
                rawSteering, rawThrottle, normalizedThrottle, normalizedSteering);
     }
+}
+
+void GamepadController::processAudioControls(const uni_gamepad_t* gp) {
+    if (!m_audioController) {
+        return;
+    }
+    
+    if (!m_audioController->isInitialized()) {
+        printf("DEBUG: Audio controller not initialized!\n");
+        return;
+    }
+    
+    // Static variables to track button states (prevent retriggering while held)
+    static bool previousAButton = false;
+    
+    // Check if A button is currently pressed
+    bool currentAButton = (gp->buttons & BUTTON_A) != 0;
+    
+    // Trigger audio on A button press (not release)
+    if (currentAButton && !previousAButton) {
+        printf("A button pressed - triggering random audio!\n");
+        
+        // Play a random audio file
+        if (m_audioController) {
+            bool success = m_audioController->playRandomAudio();
+            if (success) {
+                printf("GamepadController: Random audio playback started\n");
+            } else {
+                printf("GamepadController: Failed to start random audio playback\n");
+            }
+        } else {
+            printf("GamepadController: No audio controller available\n");
+        }
+    }
+    
+    // Update previous button state
+    previousAButton = currentAButton;
 }
 
 } // namespace Exterminate

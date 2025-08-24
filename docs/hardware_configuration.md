@@ -164,8 +164,8 @@ Speaker- -->  Speaker Negative Terminal
 ```text
 LED Pin      Pico W      Function
 -------      ------      --------
-LED 1 +  --> GPIO 11     PWM Control (Audio Intensity)
-LED 2 +  --> GPIO 12     PWM Control (Audio Intensity)
+LED 1 +  --> GPIO 37     PWM Control (Audio Intensity)
+LED 2 +  --> GPIO 38     PWM Control (Audio Intensity)
 All -    --> GND         Common Ground
 ```
 
@@ -194,7 +194,7 @@ All -    --> GND         Common Ground
 ```text
 Eye Stalk LED   Pico W      Function
 --------------  ------      --------
-LED +       -->  GPIO 15     Digital Control (Status)
+LED +       -->  GPIO 36     Digital Control (Status)
 LED -       -->  GND         Ground (via series resistor: blue 100–150Ω)
 ```
 

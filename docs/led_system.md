@@ -4,12 +4,12 @@ This project now uses a lightweight SimpleLED helper instead of the previous LED
 
 ## LEDs overview
 
-- Eye stalk: 1 blue LED (Bluetooth status) on GPIO 15. Blinks while pairing, solid when paired.
-- Dome: 2 red LEDs (audio visualization) on GPIO 11 and GPIO 12 driven by PWM.
+- Eye stalk: 1 blue LED (Bluetooth status) on GPIO 36 (moved from GPIO 15 -> 40 -> 36). Breathing while pairing, solid when paired.
+- Dome: 2 red LEDs (audio visualization) on GPIO 37 and GPIO 38 (moved from GPIO 11/12 -> 18/19 -> 41/42 -> 37/38) driven by PWM.
 
 ## Audio visualization LEDs
 
-- External LEDs on GPIO 11 and 12 are driven with PWM.
+- External LEDs on GPIO 37 and 38 are driven with PWM.
 - Brightness is updated by a repeating timer in `src/main.cpp` using `AudioController::getAudioIntensity()` with a deadzone, gamma, and a short peak-hold.
 - Onboard LED is not used.
 
@@ -20,8 +20,8 @@ Wiring (dome LEDs):
 ```text
 Pico W          LEDs
 ------          ----
-GPIO 11  -----> LED 1 (red) Anode (via 150Ω; 100Ω if brighter)
-GPIO 12  -----> LED 2 (red) Anode (via 150Ω; 100Ω if brighter)
+GPIO 37  -----> LED 1 (red) Anode (via 150Ω; 100Ω if brighter)
+GPIO 38  -----> LED 2 (red) Anode (via 150Ω; 100Ω if brighter)
 GND      -----> Both cathodes
 ```
 
@@ -30,8 +30,10 @@ Wiring (eye-stalk status LED):
 ```text
 Pico W          LED (Blue)
 ------          ---------
-GPIO 15  -----> Anode (via 100–150Ω)
+GPIO 36  -----> Anode (via 100–150Ω)
 GND      -----> Cathode
+
+Note: GPIO 43 is reserved for future VBAT sense circuitry and intentionally not used for LEDs.
 ```
 
 Resistor and driver guidance:

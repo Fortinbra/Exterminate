@@ -204,8 +204,9 @@ Exterminate/
 │   ├── mp3_to_header.py         # MP3 to C++ header converter
 │   ├── convert_audio.ps1        # PowerShell conversion script
 │   └── convert_audio.bat        # Batch conversion script
-├── docs/                         # Project documentation
-│   └── audio_system.md          # Audio system documentation
+├── docs/                         # Project & build documentation
+│   ├── audio_system.md          # Audio system documentation
+│   └── build/                   # Build + assembly guides (see README there)
 ├── tests/                        # Unit tests (future)
 ├── build/                        # Build output (generated)
 ├── CMakeLists.txt               # Build system configuration

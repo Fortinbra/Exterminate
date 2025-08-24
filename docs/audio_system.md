@@ -127,9 +127,9 @@ AudioController::Config cfg = AudioController::Config::getDefault();
 AudioController audioController(cfg);
 audioController.initialize();
 
-// Use SimpleLED to set up PWM on two external LEDs (GPIO 11 and 12)
-Exterminate::SimpleLED::initializePwmPin(11, /*wrap*/ 255, /*clkdiv*/ 4.0f);
-Exterminate::SimpleLED::initializePwmPin(12, /*wrap*/ 255, /*clkdiv*/ 4.0f);
+// Use SimpleLED to set up PWM on two external LEDs (GPIO 37 and 38)
+Exterminate::SimpleLED::initializePwmPin(37, /*wrap*/ 255, /*clkdiv*/ 4.0f);
+Exterminate::SimpleLED::initializePwmPin(38, /*wrap*/ 255, /*clkdiv*/ 4.0f);
 
 // Play audio; a repeating timer in main.cpp maps audio intensity to LED brightness
 audioController.playAudio(Exterminate::Audio::AudioIndex::AUDIO_00001);

@@ -14,8 +14,9 @@ namespace {
     bool g_available = false;
     uint g_pin = 0;
 
-    // Store PWM wrap per pin so we can compute brightness without querying hardware
-    constexpr uint MAX_PIN_INDEX = 40; // enough for RP2xxx
+    // Store PWM wrap per pin so we can compute brightness without querying hardware.
+    // Increased to support higher GPIO numbers (e.g., 35-47 range used for external LEDs).
+    constexpr uint MAX_PIN_INDEX = 64; // ample for current RP2/RP23xx families
     uint16_t g_pwmWrapByPin[MAX_PIN_INDEX] = {0};
 }
 

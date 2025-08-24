@@ -200,41 +200,32 @@ bool AudioController::playAudio(Audio::AudioIndex audioIndex) {
     currentAudioSize_ = audioFile->sample_count;
     currentAudioPosition_ = 0;
 
-    // Start playback
-    playbackState_ = PlaybackState::Playing;
+    // Instead of multicore, use timer-based audio streaming on the same core
+    printf("AudioController: Audio acknowledged - starting timer-based streaming\n");
+    printf("AudioController: Using single-core approach to avoid BluePad32 conflicts\n");
+    printf("AudioController: Creating LED pulse effect\n");
     
-    // Start the audio worker loop
-    startAudioWorker();
+    // Create LED pulse effect
+    audioIntensity_ = 0.9f;  // High intensity for LED reaction
     
-    printf("AudioController: Playback started\n");
+    // Start timer-based audio worker instead of multicore
+    startTimerBasedAudioStreaming();
+    
     return true;
 }
 
-void AudioController::startAudioWorker() {
-    // Launch a simple audio worker on core 1
-    multicore_launch_core1([]() {
-        AudioController* controller = AudioController::instance_;
-        if (!controller) return;
-        
-        printf("AudioController: Audio worker started on core 1\n");
-        
-        while (controller->playbackState_ != PlaybackState::Stopped) {
-            // Get a buffer from the pool
-            audio_buffer_t* buffer = take_audio_buffer(controller->bufferPool_, false);
-            if (buffer) {
-                // Fill the buffer
-                controller->fillAudioBuffer(buffer);
-                
-                // Send it to the I2S output
-                give_audio_buffer(controller->bufferPool_, buffer);
-            } else {
-                // No buffer available, yield
-                sleep_ms(1);
-            }
-        }
-        
-        printf("AudioController: Audio worker stopped\n");
-    });
+bool AudioController::playRandomAudio() {
+    if (!initialized_) {
+        printf("AudioController: Cannot play random audio - not initialized\n");
+        return false;
+    }
+
+    // For now, we only have one audio file, so "random" is just that one file
+    // In the future, when more audio files are added, we can implement proper randomization
+    Audio::AudioIndex randomIndex = Audio::AudioIndex::AUDIO_00001;
+    
+    printf("AudioController: Triggering random audio (simplified mode)\n");
+    return playAudio(randomIndex);
 }
 
 bool AudioController::stopAudio() {
@@ -245,6 +236,7 @@ bool AudioController::stopAudio() {
     printf("AudioController: Stopping audio playback\n");
     
     playbackState_ = PlaybackState::Stopped;
+    
     currentAudioData_ = nullptr;
     currentAudioSize_ = 0;
     currentAudioPosition_ = 0;
@@ -377,6 +369,58 @@ void AudioController::audioCallback(void* userData) {
         // Give the buffer back to the audio system
         give_audio_buffer(controller->bufferPool_, buffer);
     }
+}
+
+void AudioController::startTimerBasedAudioStreaming() {
+    if (!initialized_ || !bufferPool_) {
+        printf("AudioController: Cannot start streaming - not initialized\n");
+        return;
+    }
+    
+    if (!currentAudioData_ || currentAudioSize_ == 0) {
+        printf("AudioController: Cannot start streaming - no audio data loaded\n");
+        return;
+    }
+    
+    // Set playback state
+    playbackState_ = PlaybackState::Playing;
+    
+    printf("AudioController: Starting timer-based audio streaming...\n");
+    
+    // Start a timer that fills audio buffers every 5ms
+    // This approaches provides regular buffer filling without multicore conflicts
+    add_repeating_timer_ms(5, [](repeating_timer_t* rt) -> bool {
+        AudioController* controller = AudioController::instance_;
+        if (!controller || controller->playbackState_ != PlaybackState::Playing) {
+            printf("AudioController: Timer-based streaming stopped\n");
+            return false; // Stop the timer
+        }
+        
+        // Try to fill available buffers (non-blocking)
+        for (int i = 0; i < 2; ++i) { // Fill up to 2 buffers per timer tick
+            audio_buffer_t* buffer = take_audio_buffer(controller->bufferPool_, false);
+            if (buffer) {
+                size_t samplesWritten = controller->fillAudioBuffer(buffer);
+                
+                if (samplesWritten > 0) {
+                    // Send filled buffer to I2S output
+                    give_audio_buffer(controller->bufferPool_, buffer);
+                } else {
+                    // No more audio data, end of playback
+                    give_audio_buffer(controller->bufferPool_, buffer);
+                    controller->playbackState_ = PlaybackState::Stopped;
+                    printf("AudioController: Audio playback completed\n");
+                    return false; // Stop the timer
+                }
+            } else {
+                break; // No more buffers available right now
+            }
+        }
+        
+        return true; // Keep timer running
+    }, nullptr, &audioStreamingTimer_);
+    
+    printf("AudioController: Timer-based streaming started\n");
 }
 
 } // namespace Exterminate
