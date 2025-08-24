@@ -6,6 +6,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# BluePad32 configuration
+set(BLUEPAD32_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/bluepad32)
+set(BTSTACK_ROOT ${PICO_SDK_PATH}/lib/btstack)
+
 # Initialise pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
 
@@ -15,18 +19,20 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
+set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.1.1)
+set(picotoolVersion 2.2.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pimoroni_pico_plus2_w_rp2350 CACHE STRING "Board type")
+# Use the official Pimoroni Pico Plus 2 W RP2350 board definition
+set(PICO_BOARD pimoroni_pico_plus2_w_rp2350 CACHE STRING "Board type" FORCE)
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
+include(pico_extras_import.cmake)
 
 project(Exterminate C CXX ASM)
 
@@ -35,25 +41,19 @@ set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-# BluePad32 configuration
-set(BLUEPAD32_ROOT ${CMAKE_CURRENT_LIST_DIR}/lib/bluepad32)
-
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(Exterminate 
     src/main.cpp 
-    src/exterminate_platform.cpp 
-    src/MotorController.cpp 
     src/AudioController.cpp
-    src/I2S.cpp
-    src/LEDController.cpp
+    src/AudioData.cpp
+    src/AudioIndex.cpp
+    src/SimpleLED.cpp
+    src/MotorController.cpp
+    src/GamepadController.cpp
 )
-
 pico_set_program_name(Exterminate "Exterminate")
 pico_set_program_version(Exterminate "0.1")
-
-# Generate PIO headers
-pico_generate_pio_header(Exterminate ${CMAKE_CURRENT_LIST_DIR}/src/i2s.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(Exterminate 1)
@@ -61,7 +61,28 @@ pico_enable_stdio_usb(Exterminate 0)
 
 # Add the standard library to the build
 target_link_libraries(Exterminate
-        pico_stdlib)
+        pico_stdlib
+        pico_cyw43_arch_none
+        pico_btstack_classic
+        pico_btstack_cyw43
+        hardware_pwm
+        pico_audio_i2s
+        pico_multicore
+        bluepad32)
+
+# Needed for btstack_config.h / sdkconfig.h
+# so that libbluepad32 can include them - MUST be before add_subdirectory
+include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
+
+# Need for BTstack headers
+include_directories(${BTSTACK_ROOT}/src)
+
+# Needed for btstack_config.h / sdkconfig.h
+# so that libbluepad32 can include them
+include_directories(src)
+
+# Add BluePad32 library 
+add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
 
 # Add the standard include files to the build
 target_include_directories(Exterminate PRIVATE
@@ -71,38 +92,6 @@ target_include_directories(Exterminate PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/src
         ${BLUEPAD32_ROOT}/src/components/bluepad32/include
 )
-
-# Needed when using BTstack from our branch
-include_directories(${PICO_SDK_PATH}/lib/btstack/3rd-party/bluedroid/encoder/include)
-include_directories(${PICO_SDK_PATH}/lib/btstack/3rd-party/bluedroid/decoder/include)
-include_directories(${PICO_SDK_PATH}/lib/btstack/src)
-
-# Add any user requested libraries
-target_link_libraries(Exterminate 
-        hardware_pio
-        hardware_pwm
-        hardware_dma
-        pico_cyw43_arch_none
-        pico_btstack_classic
-        pico_btstack_cyw43
-        bluepad32
-        )
-
-# Needed for btstack_config.h / sdkconfig.h
-# so that libbluepad32 can include them
-include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
-
-# Add compile definitions to help with BluePad32 compatibility
-add_compile_definitions(NDEBUG)
-
-# Add BluePad32 subdirectory
-add_subdirectory(${BLUEPAD32_ROOT}/src/components/bluepad32 libbluepad32)
-
-# Workaround for missing assert.h includes in BluePad32 - apply only to C files
-target_compile_options(bluepad32 PRIVATE $<$<COMPILE_LANGUAGE:C>:-include assert.h>)
-
-# Make sure BluePad32 can find our config files
-target_include_directories(bluepad32 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 pico_add_extra_outputs(Exterminate)
 

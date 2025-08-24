@@ -116,31 +116,35 @@ class MotorController {
 
 ### 4. I2S Audio Subsystem
 
-**Files**: `src/I2S.cpp`, `include/I2S.h`, `src/i2s.pio`
+**Files**: `src/AudioController.cpp`, `include/AudioController.h`
 
 **Responsibilities**:
-- PIO-based I2S protocol implementation
-- Precise audio timing and clock generation
-- DMA-based audio streaming
-- Hardware-level audio output
+- Pico-extras I2S library integration
+- Resource discovery and management
+- DMA-based audio streaming via library
+- Hardware-level audio output abstraction
 
 **Architecture**:
-- **PIO State Machines**: Custom assembly for I2S timing
-- **DMA Integration**: Double-buffered continuous audio
-- **Hardware Abstraction**: Clean C++ interface over PIO complexity
-- **RAII Design**: Automatic resource management
+- **Pico-Extras Integration**: Uses battle-tested `audio_i2s_setup()` from pico-extras library
+- **Resource Discovery Pattern**: Finds available DMA channels and PIO state machines without pre-claiming
+- **Library-Managed Resources**: Lets pico-extras I2S library handle internal resource claiming
+- **RAII Design**: Automatic resource management and cleanup
+
+**Resource Management Fix**:
+The system uses a discovery pattern to avoid DMA channel conflicts:
 
 ```cpp
-class I2S {
-    // Configure PIO-based I2S
-    explicit I2S(const Config& config);
-    ~I2S();
-    
-    // Audio streaming interface
-    void start();
-    void writeAudio(const int16_t* data, size_t samples);
-    void stop();
-};
+// Find available resources without claiming them permanently
+int dma_channel = dma_claim_unused_channel(false);
+uint pio_sm = pio_claim_unused_sm(pio, false);
+
+// Immediately unclaim for library to use
+dma_channel_unclaim(dma_channel);
+pio_sm_unclaim(pio, pio_sm);
+
+// Let pico-extras library claim them internally
+audio_i2s_config_t config = { /* ... */ };
+audio_i2s_setup(&format, &config);
 ```
 
 ### 5. Audio Controller Subsystem
@@ -148,14 +152,16 @@ class I2S {
 **Files**: `src/AudioController.cpp`, `include/AudioController.h`, `include/audio/*`
 
 **Responsibilities**:
+
 - High-level audio playback management
 - Embedded audio file handling
 - LED integration and audio intensity calculation
 - Volume control and audio mixing
 
 **Architecture**:
+
 - **Embedded Resources**: MP3 files converted to PCM byte arrays
-- **I2S Integration**: Uses I2S class for hardware output
+- **Pico-Extras Integration**: Uses pico-extras I2S library for hardware output
 - **LED Synchronization**: Real-time audio intensity for LED effects
 - **Resource Management**: Compile-time audio file registry
 
@@ -168,35 +174,29 @@ class AudioController {
     void playAudio(AudioIndex audioFile);
     float getAudioIntensity() const;  // For LED synchronization
     void setVolume(float volume);
+    bool initialize();  // Resource discovery and setup
 };
 ```
 
-### 6. LED Controller Subsystem
+### 6. LED Subsystem (SimpleLED)
 
-**Files**: `src/LEDController.cpp`, `include/LEDController.h`
+**Files**: `src/SimpleLED.cpp`, `include/SimpleLED.h`
 
 **Responsibilities**:
-- PWM-based LED intensity control
-- Audio-reactive visual effects
-- Multiple lighting patterns and effects
-- Real-time LED synchronization
+- Initialize PWM on external LED pins
+- Set per-pin brightness from 0.0 to 1.0
+- Integrate with audio intensity via a repeating timer in `main.cpp`
 
 **Architecture**:
-- **PWM Control**: Hardware PWM for smooth LED dimming
-- **Effect Patterns**: Multiple visual effect algorithms
-- **Audio Integration**: Real-time response to audio intensity
-- **Modular Design**: Easy addition of new effects
+- **PWM Control**: Hardware PWM via Pico SDK
+- **Mapping**: Deadzone, gamma and peak-hold applied in `main.cpp`
 
 ```cpp
-class LEDController {
-    // Configure LED hardware
-    explicit LEDController(const Config& config);
-    
-    // Effect control interface
-    void setEffect(Effect effect);
-    void updateLEDs(float intensity);  // Audio-driven updates
-    void setBrightness(float brightness);
-};
+// Example usage in main.cpp
+Exterminate::SimpleLED::initializePwmPin(11, 255, 4.0f);
+Exterminate::SimpleLED::initializePwmPin(12, 255, 4.0f);
+Exterminate::SimpleLED::setBrightnessPin(11, 0.75f);
+Exterminate::SimpleLED::setBrightnessPin(12, 0.5f);
 ```
 
 ## Data Flow Architecture

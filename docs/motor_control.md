@@ -2,32 +2,39 @@
 
 ## Overview
 
-The Motor Control System provides differential drive control for the Exterminate Dalek robot using a DRV8833 dual H-bridge motor driver. This system enables forward/backward movement, turning, and rotation in place.
+The Motor Control System provides differential drive control for the Exterminate Dalek robot using the Pimoroni Motor Shim for Pico (stacked on the Pico LiPo 2 XL W). This system enables forward/backward movement, turning, and rotation in place.
 
 ## Hardware Setup
 
-### DRV8833 Motor Driver
+### Pimoroni Motor Shim for Pico
 
-The DRV8833 is a dual H-bridge motor driver that can control two DC motors with speeds up to 1.2A continuous current per motor.
+The Motor Shim is a dual H-bridge driver board that stacks on the Pico and exposes motor terminals and VMOTOR input. It routes control pins to Pico GPIO as follows:
 
-**Pin Connections:**
+```text
+Pico GPIO | Shim Signal | Function
+----------|-------------|---------
+GPIO 6    | AIN1        | Left Motor Direction 1 (PWM)
+GPIO 7    | AIN2        | Left Motor Direction 2 (PWM)
+GPIO 27   | BIN1        | Right Motor Direction 1 (PWM)
+GPIO 26   | BIN2        | Right Motor Direction 2 (PWM)
 ```
-Pico Pin  | DRV8833 Pin | Function
-----------|-------------|----------
-GPIO 2    | AIN1        | Left Motor Direction 1
-GPIO 3    | AIN2        | Left Motor Direction 2  
-GPIO 4    | BIN1        | Right Motor Direction 1
-GPIO 5    | BIN2        | Right Motor Direction 2
-3.3V      | VCC         | Logic Power Supply
-GND       | GND         | Ground
-VBAT      | VMOT        | Motor Power Supply (6-10.8V)
+
+Power and motors connect directly to the shim:
+
+```text
+Motor Shim   Function
+----------   -----------------------------------------
+VMOTOR       Motor supply input (per shim spec)
+MOTOR A +/-  Left motor terminals (connect to motor)
+MOTOR B +/-  Right motor terminals (connect to motor)
 ```
 
 ### Motor Connections
 
-Connect your DC motors to the motor output terminals:
-- **Motor A (Left)**: AO1 and AO2 terminals
-- **Motor B (Right)**: BO1 and BO2 terminals
+Connect your DC motors to the shim’s motor output terminals:
+
+- **Motor A (Left)**: MOTOR A +/−
+- **Motor B (Right)**: MOTOR B +/−
 
 **Motor Polarity**: If a motor spins in the wrong direction, swap the two wires for that motor.
 
@@ -39,42 +46,43 @@ Connect your DC motors to the motor output terminals:
 #include "MotorController.h"
 
 // Configure motor controller
-MotorController::Config config;
-config.leftMotorPin1 = 2;    // GPIO 2 -> AIN1
-config.leftMotorPin2 = 3;    // GPIO 3 -> AIN2  
-config.rightMotorPin1 = 4;   // GPIO 4 -> BIN1
-config.rightMotorPin2 = 5;   // GPIO 5 -> BIN2
-config.pwmFrequency = 10000; // 10kHz PWM
+Exterminate::MotorController::Config config{};
+config.leftMotorPin1 = 6;    // GPIO 6 -> AIN1 (Motor Shim)
+config.leftMotorPin2 = 7;    // GPIO 7 -> AIN2 (Motor Shim)
+config.rightMotorPin1 = 27;  // GPIO 27 -> BIN1 (Motor Shim)
+config.rightMotorPin2 = 26;  // GPIO 26 -> BIN2 (Motor Shim)
+config.pwmFrequency = 20000; // 20 kHz PWM (default used in code)
 
 // Create motor controller instance
-MotorController motors(config);
+Exterminate::MotorController motors(config);
 
-// Basic movement commands
-motors.moveForward(0.5f);    // 50% speed forward
-motors.moveBackward(0.3f);   // 30% speed backward
-motors.turnLeft(0.4f);       // Turn left at 40% speed
-motors.turnRight(0.4f);      // Turn right at 40% speed
-motors.stop();               // Stop all motors
+// Initialize hardware
+if (!motors.initialize()) {
+    // Handle initialization error
+}
+
+// Basic movement examples using the public API
+motors.setMotorSpeed(Exterminate::MotorController::Motor::LEFT, 0.5f);   // Left forward 50%
+motors.setMotorSpeed(Exterminate::MotorController::Motor::RIGHT, 0.5f);  // Right forward 50%
+
+// Stop all motors
+motors.stopAllMotors();
 ```
 
 ### Individual Motor Control
 
 ```cpp
 // Control motors independently
-motors.setMotorSpeed(MotorController::Motor::LEFT, 0.7f);   // Left motor 70% forward
-motors.setMotorSpeed(MotorController::Motor::RIGHT, -0.5f); // Right motor 50% backward
-
-// Get current motor speeds
-float leftSpeed = motors.getMotorSpeed(MotorController::Motor::LEFT);
-float rightSpeed = motors.getMotorSpeed(MotorController::Motor::RIGHT);
+motors.setMotorSpeed(Exterminate::MotorController::Motor::LEFT, 0.7f);   // Left motor 70% forward
+motors.setMotorSpeed(Exterminate::MotorController::Motor::RIGHT, -0.5f); // Right motor 50% backward
 ```
 
 ### Differential Drive Control
 
 ```cpp
 // Advanced differential drive
-// linear: forward/backward speed (-1.0 to 1.0)
-// angular: rotation speed (-1.0 to 1.0)
+// forward: forward/backward speed (-1.0 to 1.0)
+// turn: rotation rate (-1.0 to 1.0)
 motors.setDifferentialDrive(0.5f, 0.2f);  // Forward with slight right turn
 ```
 
@@ -83,6 +91,7 @@ motors.setDifferentialDrive(0.5f, 0.2f);  // Forward with slight right turn
 ### PWM Control
 
 The motor controller uses PWM (Pulse Width Modulation) to control motor speed:
+
 - **Frequency**: 10kHz (configurable)
 - **Duty Cycle**: 0-100% controls speed
 - **Direction**: Controlled by which pins are PWM vs static
@@ -99,12 +108,14 @@ The motor controller uses PWM (Pulse Width Modulation) to control motor speed:
 ### Differential Drive Kinematics
 
 For a two-wheeled robot:
-```
+
+```text
 Left Motor Speed  = Linear Speed - Angular Speed
 Right Motor Speed = Linear Speed + Angular Speed
 ```
 
 This allows:
+
 - **Forward**: Both motors same speed, same direction
 - **Backward**: Both motors same speed, opposite direction  
 - **Turn**: Motors different speeds
@@ -112,26 +123,18 @@ This allows:
 
 ## Safety Features
 
-### Current Limiting
+### Current and Thermal Considerations
 
-The DRV8833 includes built-in current limiting and thermal protection:
-- **Peak Current**: 2A per motor (brief)
-- **Continuous Current**: 1.2A per motor
-- **Thermal Shutdown**: Automatic at ~150°C
+Refer to the Pimoroni Motor Shim specifications for peak and continuous current limits and thermal behavior. Ensure your motors and supply are within ratings.
 
-### Software Protections
+### Software Notes
 
 ```cpp
-// Speed clamping (automatic)
-motors.setMotorSpeed(Motor::LEFT, 1.5f);  // Automatically clamped to 1.0f
+// Speed clamping (automatic within [-1.0, 1.0])
+motors.setMotorSpeed(Exterminate::MotorController::Motor::LEFT, 1.5f);  // Clamped to 1.0f
 
-// Emergency stop
-motors.emergencyStop();  // Immediately stops all motors
-
-// Check if motors are enabled
-if (motors.isEnabled()) {
-    // Safe to operate
-}
+// Stop all motors
+motors.stopAllMotors();
 ```
 
 ## Troubleshooting
@@ -139,21 +142,25 @@ if (motors.isEnabled()) {
 ### Common Issues
 
 **Motor doesn't move:**
+
 1. Check power supply to VMOT (6-10.8V)
 2. Verify motor connections
 3. Check GPIO pin assignments
 4. Ensure sufficient current capacity
 
 **Motor moves wrong direction:**
+
 1. Swap the two motor wires
 2. Or invert the speed value in software
 
 **Jerky movement:**
+
 1. Lower PWM frequency (try 1kHz)
 2. Add motor capacitors if not present
 3. Check power supply stability
 
 **Motors overheat:**
+
 1. Reduce continuous speed
 2. Add heatsink to DRV8833
 3. Check for mechanical binding
@@ -162,6 +169,7 @@ if (motors.isEnabled()) {
 ### Debug Output
 
 Enable debug output to monitor motor state:
+
 ```cpp
 #define MOTOR_DEBUG 1  // In your build configuration
 

@@ -42,7 +42,7 @@ This documentation provides comprehensive information for building, programming,
 
 **[Motor Control](motor_control.md)** - Movement and servo systems
 
-- DRV8833 motor driver integration and configuration
+- Pimoroni Motor Shim integration and configuration
 - Differential drive mathematics and implementation
 - Servo control for eye stalk movement
 - PWM signal generation and timing requirements
@@ -79,6 +79,13 @@ This documentation provides comprehensive information for building, programming,
 - Debugging techniques and profiling tools
 - Testing strategies and continuous integration
 
+**[Troubleshooting: DMA Conflicts](troubleshooting_dma_conflicts.md)** - Critical system fixes
+
+- Resolution for "DMA channel already claimed" runtime panics
+- LED staying solid and gamepad pairing issues  
+- Resource discovery pattern implementation
+- Prevention strategies for library integration conflicts
+
 ## Documentation Structure
 
 ### By Experience Level
@@ -101,7 +108,7 @@ This documentation provides comprehensive information for building, programming,
 ### By System Component
 
 **Movement System:**
-- [Motor Control](motor_control.md) - DRV8833 integration
+- [Motor Control](motor_control.md) - Pimoroni Motor Shim integration
 - [Hardware Configuration](hardware_configuration.md) - Wiring details
 - [Gamepad Control](gamepad_control.md) - Input handling
 
@@ -126,7 +133,7 @@ This documentation provides comprehensive information for building, programming,
 
 - **Microcontroller**: Raspberry Pi Pico W (RP2350) with dual-core Cortex-M33
 - **Wireless**: Built-in Wi-Fi and Bluetooth 5.2 with BluePad32 gamepad support
-- **Movement**: Differential drive with DRV8833 dual motor driver
+- **Movement**: Differential drive with Pimoroni Motor Shim
 - **Audio**: I2S DAC output with embedded MP3 sound effects  
 - **Servo Control**: PWM-based eye stalk movement control
 - **Expansion**: Multiple GPIO pins available for additional features

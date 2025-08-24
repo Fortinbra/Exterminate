@@ -24,7 +24,7 @@ Exterminate is an animatronic Dalek control system that enables wireless gamepad
 - **Differential Drive Control**: Sophisticated two-wheel movement with forward/reverse and turning
 - **DRV8833 Motor Driver**: High-efficiency dual H-bridge motor control with PWM speed regulation
 - **Servo Eye Stalk Control**: Precise servo motor control for authentic Dalek eye movement
-- **PIO-Based I2S Audio**: High-quality 22.05kHz PCM audio output using custom PIO state machines
+- **PIO-Based I2S Audio**: High-quality 44.1kHz PCM audio output using pico-extras I2S library
 - **Audio-Reactive LEDs**: Real-time LED visualization that pulses with audio intensity for authentic Dalek head lighting
 - **Controller Status LED**: Visual feedback showing controller connection status (solid when paired, flashing when waiting)
 - **Modern C++17**: Clean, maintainable code following SOLID principles and RAII patterns
@@ -177,7 +177,7 @@ Exterminate/
 │   ├── exterminate_platform.h     # Platform interface declarations
 │   ├── MotorController.h          # Motor driver class interface
 │   ├── AudioController.h          # Audio controller class interface
-│   ├── LEDController.h            # LED effects controller interface
+│   ├── SimpleLED.h                # Minimal LED helper (PWM)
 │   ├── I2S.h                      # PIO-based I2S audio interface
 │   └── audio/                     # Generated audio headers (from MP3s)
 │       ├── 00001.h                # "Exterminate!" audio data
@@ -189,7 +189,7 @@ Exterminate/
 │   ├── exterminate_platform.cpp  # BluePad32 platform implementation
 │   ├── MotorController.cpp       # Motor control implementation
 │   ├── AudioController.cpp       # Audio control implementation
-│   ├── LEDController.cpp         # LED effects implementation
+│   ├── SimpleLED.cpp             # Minimal LED helper implementation
 │   ├── I2S.cpp                   # PIO-based I2S implementation
 │   ├── i2s.pio                   # PIO assembly for I2S state machines
 │   ├── btstack_config.h          # BTstack configuration
@@ -204,8 +204,9 @@ Exterminate/
 │   ├── mp3_to_header.py         # MP3 to C++ header converter
 │   ├── convert_audio.ps1        # PowerShell conversion script
 │   └── convert_audio.bat        # Batch conversion script
-├── docs/                         # Project documentation
-│   └── audio_system.md          # Audio system documentation
+├── docs/                         # Project & build documentation
+│   ├── audio_system.md          # Audio system documentation
+│   └── build/                   # Build + assembly guides (see README there)
 ├── tests/                        # Unit tests (future)
 ├── build/                        # Build output (generated)
 ├── CMakeLists.txt               # Build system configuration
@@ -235,22 +236,15 @@ The project follows **SOLID principles** and modern C++ best practices:
 
 #### `AudioController`
 
-- **Purpose**: PIO-based I2S audio output with LED integration
-- **Features**: 22.05kHz PCM audio playback, real-time audio intensity calculation, LED synchronization
-- **Interface**: `playAudio()`, `stopAudio()`, `getAudioIntensity()`, LED integration methods
+- **Purpose**: Pico-extras I2S audio output with LED integration
+- **Features**: 44.1kHz PCM audio playback, real-time audio intensity calculation, LED synchronization, resource discovery pattern
+- **Interface**: `playAudio()`, `stopAudio()`, `getAudioIntensity()`, `initialize()` methods
 
-#### `LEDController`
+#### `SimpleLED`
 
-- **Purpose**: PWM-based LED effects for audio visualization
-- **Features**: Multiple effect patterns (Pulse, Alternate, Wave, Breathe), real-time intensity control
-- **Interface**: `setEffect()`, `updateLEDs()`, `setBrightness()`, pattern configuration
-
-#### `I2S`
-
-- **Purpose**: Hardware abstraction for PIO-based I2S audio output
-- **Features**: Custom PIO state machines, DMA double-buffering, configurable sample rates, RAII design
-- **Interface**: `configure()`, `start()`, `stop()`, `writeAudio()`, interrupt handling
-- **Based on**: [malacalypse/rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) PIO implementation
+- **Purpose**: Lightweight PWM helper for external LEDs
+- **Features**: Pin init, PWM init, and brightness setting; audio-driven updates done in `main.cpp`
+- **Interface**: `initializePwmPin()`, `setBrightnessPin()`
 
 #### `exterminate_platform`
 
@@ -263,7 +257,7 @@ The project follows **SOLID principles** and modern C++ best practices:
 ```text
 Gamepad Input → BluePad32 → Platform Handler → Motor Controller → Drive Motors (Movement)
                                             └→ Servo Controller → Eye Stalk Movement  
-                                            └→ Audio Controller → I2S PIO → Speaker
+                                            └→ Audio Controller → Pico-Extras I2S → Speaker
                                             └→ LED Controller → PWM LEDs → Audio Visualization
                                             └→ Status LED → Controller Connection Feedback
 ```
@@ -293,12 +287,9 @@ AudioController::Config audioConfig = {
     .bitsPerSample = 16        // 16-bit PCM audio
 };
 
-// LEDController configuration for audio visualization
-LEDController::Config ledConfig = {
-    .ledPins = {11, 12, 13, 14}, // GPIO pins for audio LEDs
-    .numLEDs = 4,                // Number of visualization LEDs
-    .pwmFrequency = 1000         // 1kHz PWM frequency
-};
+// SimpleLED setup for audio visualization (example)
+Exterminate::SimpleLED::initializePwmPin(11, 255, 4.0f);
+Exterminate::SimpleLED::initializePwmPin(12, 255, 4.0f);
 
 // Controller status LED configuration
 const uint controllerStatusPin = 15;  // GPIO 15 for status indication
@@ -402,6 +393,12 @@ While embedded testing is complex, the modular design supports unit testing:
    - Ensure C++17 standard is enabled
    - Check include paths for BluePad32
    - Verify btstack configuration files
+
+7. **DMA Channel Conflicts** (Critical Fix Applied):
+   - **Symptoms**: Runtime panic "DMA channel X is already claimed", LED staying solid, gamepad not pairing
+   - **Root Cause**: Pico-extras I2S library expects to manage its own resources internally
+   - **Solution**: Resource discovery pattern implemented in AudioController::initialize()
+   - **Reference**: See `docs/troubleshooting_dma_conflicts.md` for detailed explanation
 
 ### Debug Output
 

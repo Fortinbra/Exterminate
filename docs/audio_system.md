@@ -1,6 +1,6 @@
 # Audio System Documentation
 
-This document explains the complete audio system in the Exterminate project, including the PIO-based I2S implementation, embedded audio conversion, and LED visualization integration.
+This document explains the audio system in the Exterminate project, including the Pico Extras I2S implementation, embedded PCM audio conversion, and LED visualization integration.
 
 > **Copyright Notice**: This project is for educational purposes only. Users are responsible for ensuring they have appropriate rights to any audio content used. The "Dalek" name and associated audio are the intellectual property of the BBC.
 
@@ -8,46 +8,66 @@ This document explains the complete audio system in the Exterminate project, inc
 
 The audio system consists of three main components:
 
-1. **PIO-Based I2S Output**: Custom PIO state machines for reliable audio streaming
-2. **Embedded Audio Data**: MP3 files converted to PCM data and compiled into firmware  
-3. **LED Visualization**: Real-time audio-reactive LED effects synchronized with audio playback
+1. I2S output via Pico Extras library (reliable, battle‑tested)
+2. Embedded PCM audio data converted from MP3/WAV and compiled into firmware
+3. LED visualization: real-time audio‑reactive effects synchronized with playback
 
-## PIO-Based I2S Implementation
+## I2S Output (Pico Extras)
 
 ### Architecture
 
-The I2S system uses the RP2040's Programmable I/O (PIO) blocks to generate precise audio timing:
+The audio pipeline leverages the Pico Extras `audio_i2s` driver, which manages I2S clocks, DMA, and buffer queues:
 
-- **PIO State Machine 0**: Generates I2S bit clock (BCLK) and word select (LRCLK)
-- **PIO State Machine 1**: Outputs audio data synchronized with clocks
-- **DMA Integration**: Double-buffered DMA for continuous audio streaming
-- **Sample Rate**: 22.05kHz for optimized performance and memory usage
+- **Pico Extras `audio_i2s`**: Provides BCLK/LRCLK and streams PCM via DMA
+- **Producer buffer pool**: Triple‑buffered for smooth playback
+- **Default sample rate**: 44.1 kHz (matches converted PCM files)
+- **Resource Discovery Pattern**: Finds available DMA channels and PIO state machines without conflicts
+
+### Resource Management
+
+**Critical Implementation Detail**: The system uses a resource discovery pattern to avoid DMA channel conflicts with the pico-extras I2S library:
+
+```cpp
+// Find available resources without permanently claiming them
+int dma_channel = dma_claim_unused_channel(false);  // false = don't claim permanently
+uint pio_sm = pio_claim_unused_sm(pio, false);      // false = don't claim permanently
+
+// Immediately release for the I2S library to claim internally
+dma_channel_unclaim(dma_channel);
+pio_sm_unclaim(pio, pio_sm);
+
+// Let pico-extras library manage resources internally
+audio_i2s_config_t config = {
+    .data_pin = discovered_data_pin,
+    .clock_pin_base = discovered_clock_base,
+    .dma_channel = dma_channel,
+    .pio_sm = pio_sm
+};
+audio_i2s_setup(&format, &config);
+```
+
+**Why This Approach?**: The pico-extras I2S library expects to manage its own DMA channels and PIO state machines internally. Pre-claiming these resources causes runtime panics like "DMA channel X is already claimed".
 
 ### Hardware Configuration
 
 ```text
 GPIO Pin    I2S Signal    Function
 --------    ----------    --------
-GPIO 6      BCLK          Bit Clock (22.05kHz × 32)
-GPIO 8      LRCLK         Left/Right Word Select (22.05kHz)
-GPIO 9      DIN           Audio Data Output (16-bit PCM)
+GPIO 32     BCLK          Bit Clock base (clockPinBase)
+GPIO 33     LRCLK         Word Select (clockPinBase + 1)
+GPIO 34     DOUT          Audio Data Output (16‑bit PCM)
 ```
 
 **MAX98357A I2S Amplifier:**
+
 - **Power**: 5V from Pico W VSYS pin (up to 3W output)
 - **Speaker**: 4-8Ω impedance, 3W power handling recommended
 - **Gain**: Fixed at 9dB when GAIN pin tied to GND
 - **Efficiency**: High efficiency Class D amplifier design
 
-### PIO Assembly Programs
+**Library Integration**: The pico-extras library automatically configures PIO and DMA resources. No custom PIO assembly is required.
 
-The system includes custom PIO assembly in `src/i2s.pio`:
-
-- **Clock Generation**: Precise timing for I2S protocol compliance
-- **Data Output**: Synchronized 16-bit PCM data transmission
-- **FIFO Management**: Automatic handling of audio data flow
-
-## Embedded Audio Conversion
+## Embedded Audio Conversion (to PCM)
 
 ### Converting MP3 Files
 
@@ -72,9 +92,11 @@ The system includes custom PIO assembly in `src/i2s.pio`:
    python tools\mp3_to_header.py misc include\audio
    ```
 
-3. **Generated files** will be created in `include/audio/`:
-   - Individual headers: `00001.h`, `00002.h`, etc.
-   - Index file: `audio_index.h`
+3. Generated files will be created in `include/audio/`:
+    - Individual headers: `00001.h`, `00002.h`, etc.
+    - Index file: `audio_index.h`
+
+Note: Ensure your conversion sample rate matches the runtime I2S sample rate. The code defaults to 44,100 Hz. If you prefer 22,050 Hz, either pass `-SampleRate 22050` to the script and update `AudioController::Config.sampleRate`, or convert at 44,100 Hz to match the default.
 
 #### File Organization
 
@@ -88,58 +110,36 @@ The system includes custom PIO assembly in `src/i2s.pio`:
 
 ```cpp
 #include "AudioController.h"
-#include "LEDController.h"
+#include "SimpleLED.h"
 #include "audio/audio_index.h"
 ```
 
 ### Basic Usage
 
 ```cpp
-// Initialize audio and LED controllers
-AudioController audioController;
-LEDController ledController;
+// Initialize audio with Pico Extras I2S (defaults: dataPin=34, clockPinBase=32, sampleRate=44100)
+AudioController::Config cfg = AudioController::Config::getDefault();
+// Optional: customize pins or sample rate
+// cfg.dataPin = 34;           // I2S DOUT
+// cfg.clockPinBase = 32;      // BCLK at 32, LRCLK at 33
+// cfg.sampleRate = 44100;     // Must match converted PCM files
 
-// Configure I2S with PIO for MAX98357A
-AudioController::Config audioConfig = {
-    .bclkPin = 6,              // I2S bit clock
-    .lrclkPin = 8,             // I2S word select
-    .dinPin = 9,               // I2S data output
-    .sampleRate = 22050,       // 22.05kHz sample rate
-    .bitsPerSample = 16        // 16-bit PCM audio
-};
+AudioController audioController(cfg);
+audioController.initialize();
 
-// Configure LED visualization
-LEDController::Config ledConfig = {
-    .ledPins = {11, 12, 13, 14}, // GPIO pins for LEDs
-    .numLEDs = 4,                // Number of LEDs
-    .pwmFrequency = 1000         // 1kHz PWM
-};
+// Use SimpleLED to set up PWM on two external LEDs (GPIO 37 and 38)
+Exterminate::SimpleLED::initializePwmPin(37, /*wrap*/ 255, /*clkdiv*/ 4.0f);
+Exterminate::SimpleLED::initializePwmPin(38, /*wrap*/ 255, /*clkdiv*/ 4.0f);
 
-// Initialize both controllers
-audioController.begin(audioConfig);
-ledController.begin(ledConfig);
-
-// Play audio with LED synchronization
-audioController.playAudio(Audio::AudioIndex::AUDIO_00001);
-ledController.setEffect(LEDController::Effect::AUDIO_REACTIVE);
+// Play audio; a repeating timer in main.cpp maps audio intensity to LED brightness
+audioController.playAudio(Exterminate::Audio::AudioIndex::AUDIO_00001);
 ```
 
 ### Initialize Audio Controller
 
 ```cpp
-using namespace Exterminate;
-
-// Configure audio controller
-AudioController::Config audioConfig = {
-    .bclkPin = 18,        // I2S bit clock
-    .lrclkPin = 19,       // I2S left/right clock
-    .dinPin = 20,         // I2S data input
-    .sampleRate = 44100,  // 44.1kHz sample rate
-    .bitsPerSample = 16   // 16-bit samples
-};
-
 // Create and initialize controller
-AudioController audioController(audioConfig);
+AudioController audioController(AudioController::Config::getDefault());
 if (!audioController.initialize()) {
     // Handle initialization error
 }
@@ -175,13 +175,14 @@ float currentVolume = audioController.getVolume();
 ### Audio File Information
 
 ```cpp
-// Get total number of audio files
-size_t fileCount = AudioController::getAudioFileCount();
+// Get total number of audio files (from audio_index.h)
+size_t fileCount = Exterminate::Audio::AUDIO_FILE_COUNT;
 
 // Get information about a specific file
-const AudioFile* fileInfo = AudioController::getAudioFileInfo(AudioIndex::AUDIO_00001);
+const Exterminate::Audio::AudioFile* fileInfo = Exterminate::Audio::getAudioFile(Exterminate::Audio::AudioIndex::AUDIO_00001);
 if (fileInfo) {
-    printf("File: %s, Size: %zu bytes\\n", fileInfo->name, fileInfo->size);
+    printf("File: %s, Samples: %zu, Rate: %u Hz\n",
+           fileInfo->name, fileInfo->sample_count, fileInfo->sample_rate);
 }
 ```
 
@@ -228,33 +229,28 @@ The following audio files are currently available:
 
 ## Memory Usage
 
-Each MP3 file is stored as a byte array in flash memory:
+Each audio file is stored as PCM samples in flash memory (int16_t arrays):
 
-- **Total Size**: Approximately 2.2 MB for all 24 files
-- **Memory Type**: Flash (program memory)
-- **Access Time**: Instant (no file system overhead)
+- Memory type: Flash (program memory)
+- Access time: Instant (no filesystem)
+- Size scales with duration × sample rate × channels × 2 bytes
 
 ## Technical Notes
 
-### MP3 Decoding
+### Decoding
 
-The current implementation stores raw MP3 data. For playback, you'll need:
-
-1. **MP3 Decoder**: Software library to decode MP3 to PCM
-2. **I2S Driver**: Hardware interface for audio output
-3. **Buffering**: Audio streaming and buffer management
+The current implementation stores uncompressed PCM data. No runtime decoding is required; data is streamed directly to I2S.
 
 ### Recommended Libraries
 
-- **MP3 Decoder**: libmad, minimp3, or helix-mp3
-- **I2S**: Pico SDK hardware_i2s or PIO-based implementation
-- **Audio Processing**: Custom audio pipeline for your specific needs
+- I2S: Pico Extras `audio_i2s`
+- Optional: add DSP or effects as needed
 
 ### Performance Considerations
 
-- **Flash Usage**: Each file uses flash memory proportional to its size
-- **RAM Usage**: Only currently playing audio needs RAM buffering
-- **CPU Usage**: MP3 decoding requires CPU cycles during playback
+- Flash usage: proportional to PCM size
+- RAM usage: small I2S buffers (configurable)
+- CPU usage: minimal (DMA‑driven I2S)
 
 ## Troubleshooting
 
@@ -267,10 +263,10 @@ The current implementation stores raw MP3 data. For playback, you'll need:
 
 ### Build Integration
 
-The conversion process should be run whenever MP3 files are added or changed:
+Run the conversion whenever audio files are added or changed:
 
-1. Add new MP3 files to `misc/`
-2. Run conversion script
+1. Add new source files to `misc/`
+2. Run conversion script (ensure sample rate matches runtime)
 3. Commit generated headers to git
 4. Build project
 
