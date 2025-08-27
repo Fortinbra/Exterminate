@@ -126,48 +126,29 @@ int main() {
         printf("Audio initialization failed!\n");
     }
     
-    // Motor controller disabled due to hardware issues
-    // Initialize DRV8833 motor controller
-    // using Exterminate::MotorController;
-    
-    // If your DRV8833 breakout has nSLEEP, you can optionally define DRV8833_SLEEP_PIN
-    /*
-    #ifdef DRV8833_SLEEP_PIN
-    {
-        const uint SLP = DRV8833_SLEEP_PIN;
-        gpio_init(SLP);
-        gpio_set_dir(SLP, GPIO_OUT);
-        gpio_put(SLP, 1);
-        printf("DRV8833 nSLEEP on GPIO %u set HIGH.\n", SLP);
-    }
-    #endif
-
-    static MotorController::Config mc{
-        // leftMotorPin1 (AIN1) // 7,  // Hardware wiring: GPIO7 -> AIN1
-        // leftMotorPin2 (AIN2) // 6,  // Hardware wiring: GPIO6 -> AIN2
-        // rightMotorPin1 (BIN1) // 26, // Hardware wiring: GPIO26 -> BIN1
-        // rightMotorPin2 (BIN2) // 27, // Hardware wiring: GPIO27 -> BIN2
-        // pwmFrequency // 20000
+    // Configure the motor controller for the DRV8833
+    static MotorController::Config motorConfig{
+        .leftMotorPin1 = 6,  // AIN1
+        .leftMotorPin2 = 7,  // AIN2
+        .rightMotorPin1 = 27, // BIN1
+        .rightMotorPin2 = 26, // BIN2
+        .pwmFrequency = 20000 // 20 kHz
     };
-    static MotorController motors(mc);
-    if (motors.initialize()) {
+
+    static MotorController motorController(motorConfig);
+
+    if (motorController.initialize()) {
         printf("Motor controller initialized successfully.\n");
-        
-        // Quick motor test - brief forward motion to verify motors work
-        printf("Testing motors briefly...\n");
-        motors.setDifferentialDrive(0.3f, 0.0f);  // 30% forward
-        sleep_ms(500);  // Run for 500ms
-        motors.stopAllMotors();  // Stop
-        printf("Motor test completed.\n");
-        
-        // Connect motor controller to gamepad for tank steering
-        gamepadController.setMotorController(&motors);
-        printf("Tank steering enabled - use left analog stick to drive!\n");
     } else {
-        printf("Motor controller initialization failed.\n");
+        printf("Failed to initialize motor controller.\n");
+        return -1;
     }
-    */
-    printf("Motor controller disabled due to hardware issues.\n");
+
+    // Set the MotorController for tank-style control using existing gamepadController
+    gamepadController.setMotorController(&motorController);
+
+    // Start the gamepad event loop
+    gamepadController.startEventLoop();
     
     printf("\n");
     printf("===========================================\n");
@@ -175,7 +156,7 @@ int main() {
     printf("- Blue Eye LED: %s\n", eyeLED.isInitialized() ? "Active (breathing = pairing mode)" : "Disabled");
     printf("- Red Audio LEDs: %s\n", audio.isInitialized() ? "Active (react to audio)" : "Disabled");
     printf("- Audio System: %s\n", audio.isInitialized() ? "Ready" : "Failed");
-    printf("- Motor Control: Disabled (hardware issues)\n");
+    printf("- Motor Control: %s\n", motorController.isInitialized() ? "Ready" : "Failed");
     printf("- Gamepad Controller: Ready for connections\n");
     printf("\n");
     printf("LED Status Indicators:\n");

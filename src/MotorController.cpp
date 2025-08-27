@@ -133,15 +133,27 @@ void MotorController::setMotorSpeed(Motor motor, float speed)
     }
 
     if (speed > 0.0f) {
-        // Forward direction
-        printf("DEBUG: Motor forward - GPIO%u=%.3f, GPIO%u=0.0\n", pin1, speed, pin2);
-        setPwmDutyCycle(pin1, speed);
-        setPwmDutyCycle(pin2, 0.0f);
+        // Forward direction (now both motors use what was previously 'reverse' logic)
+        if (motor == Motor::LEFT) {
+            printf("DEBUG: Motor forward (LEFT now reverse logic) - GPIO%u=%.3f, GPIO%u=0.0\n", pin1, speed, pin2);
+            setPwmDutyCycle(pin1, speed);
+            setPwmDutyCycle(pin2, 0.0f);
+        } else {
+            printf("DEBUG: Motor forward (RIGHT now reverse logic) - GPIO%u=0.0, GPIO%u=%.3f\n", pin1, pin2, speed);
+            setPwmDutyCycle(pin1, 0.0f);
+            setPwmDutyCycle(pin2, speed);
+        }
     } else if (speed < 0.0f) {
-        // Reverse direction
-        printf("DEBUG: Motor reverse - GPIO%u=0.0, GPIO%u=%.3f\n", pin1, pin2, -speed);
-        setPwmDutyCycle(pin1, 0.0f);
-        setPwmDutyCycle(pin2, -speed);
+        // Reverse direction (now both motors use what was previously 'forward' logic)
+        if (motor == Motor::LEFT) {
+            printf("DEBUG: Motor reverse (LEFT now forward logic) - GPIO%u=0.0, GPIO%u=%.3f\n", pin1, pin2, -speed);
+            setPwmDutyCycle(pin1, 0.0f);
+            setPwmDutyCycle(pin2, -speed);
+        } else {
+            printf("DEBUG: Motor reverse (RIGHT now forward logic) - GPIO%u=%.3f, GPIO%u=0.0\n", pin1, -speed, pin2);
+            setPwmDutyCycle(pin1, -speed);
+            setPwmDutyCycle(pin2, 0.0f);
+        }
     } else {
         // Stop (brake)
         printf("DEBUG: Motor stop - GPIO%u=0.0, GPIO%u=0.0\n", pin1, pin2);
