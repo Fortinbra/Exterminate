@@ -125,7 +125,7 @@ Orange -->  GPIO 16     PWM Signal
 
 ### I2S Audio Amplifier
 
-**MAX98357A I2S Amplifier Module:**
+**MAX98357A I2S Amplifier Module:** (Adafruit MAX98357A Breakout: [Adafruit product 3006](https://www.adafruit.com/product/3006))
 
  
 ```text

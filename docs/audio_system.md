@@ -58,7 +58,7 @@ GPIO 33     LRCLK         Word Select (clockPinBase + 1)
 GPIO 34     DOUT          Audio Data Output (16‑bit PCM)
 ```
 
-**MAX98357A I2S Amplifier:**
+**MAX98357A I2S Amplifier:** (Adafruit MAX98357A Breakout: [Adafruit product 3006](https://www.adafruit.com/product/3006))
 
 - **Power**: 5V from Pico W VSYS pin (up to 3W output)
 - **Speaker**: 4-8Ω impedance, 3W power handling recommended

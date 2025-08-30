@@ -37,7 +37,7 @@ Exterminate is a Dalek control system that enables wireless gamepad control of a
 - **Raspberry Pi Pico W** (RP2350-based board like Pimoroni Pico Plus2 W)
 - **Pimoroni Motor SHIM for Pico** (DRV8833-based dual H-bridge for differential drive movement). See: [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico)
 - **Two DC Motors** (geared motors recommended for mobile Dalek base)
-- **I2S Audio Amplifier** (MAX98357A I2S amplifier for Dalek sound effects playback)
+- **I2S Audio Amplifier** (Adafruit MAX98357A I2S amplifier breakout — see [Adafruit MAX98357A Breakout (Product 3006)](https://www.adafruit.com/product/3006))
 - **PWM-Compatible LEDs** (4x LEDs for audio visualization, 1x LED for controller status)
 - **Speaker** (4-8Ω speaker, 3W recommended for MAX98357A)
 - **Bluetooth Gamepad** (PS3, PS4, Xbox, or compatible controller)

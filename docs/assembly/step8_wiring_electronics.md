@@ -2,7 +2,7 @@
 
 > Objective (Part 1): Secure the audio amplifier (MAX98357A breakout), MOSFET driver board, speaker, and both drive motors (with small drive gears) onto the `base_cover.stl`, establishing the physical foundation for later wiring, power distribution, and control electronics.
 > Scope: ONLY the operations below. Later subsections (Part 2+) will handle main MCU, power, harness routing, strain relief, connectors, and cable dressing.
-> Prerequisites: Printed `base_cover.stl`, `drive_gear.stl` (2×), cleaned motor standoffs, verified hole sizes. Components on hand: MAX98357A (or compatible MAX audio board) with screw terminal block, MOSFET driver breakout (STEMMA JST PH style), two N20 gear motors (verified ratio match), 28 mm speaker, required fasteners.
+-> Prerequisites: Printed `base_cover.stl`, `drive_gear.stl` (2×), cleaned motor standoffs, verified hole sizes. Components on hand: MAX98357A (or compatible MAX audio board) with screw terminal block, MOSFET driver breakout (STEMMA JST PH style — e.g. Adafruit MOSFET Driver [Product 5648](https://www.adafruit.com/product/5648)), two N20 gear motors (verified ratio match), 28 mm speaker, required fasteners.
 
 ---
 ## 1. Parts & Hardware (This Sub‑Step)
@@ -12,7 +12,7 @@
 | Printed | base_cover.stl | 1 | Mounting platform (remix) |
 | Printed | drive_gear.stl | 2 | Small motor pinion gears (press / slip fit) |
 | Audio | MAX98357A I2S 3 W Class D Amp | 1 | With 3‑pin or 5‑pin screw terminal (L+, L− / Vin / GND / SD) |
-| Driver | MOSFET Driver Board (STEMMA JST PH) | 1 | For higher current loads (lighting / actuators) |
+| Driver | MOSFET Driver Board (STEMMA JST PH, e.g. Adafruit product 5648) | 1 | For higher current loads (lighting / actuators) |
 | Audio | 28 mm 8 Ω 2 W speaker | 1 | Fits circular recess center of base_cover |
 | Drivetrain | N20 gear motor (3 V, 1000 RPM) | 2 | Matched pair (identical ratio) |
 | Fastener | M2.5 × 8 mm screw | 4 | Two per breakout (inserted from underside) |

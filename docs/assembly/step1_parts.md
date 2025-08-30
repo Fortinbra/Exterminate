@@ -312,7 +312,7 @@ Mechanical / drivetrain:
 Audio subsystem:
 
 - 1 × 28 mm 8 Ω 2 W speaker
-- 1 × Adafruit I2S 3 W Class D Amplifier (MAX98357A breakout)
+- 1 × Adafruit I2S 3 W Class D Amplifier (MAX98357A breakout — see [Adafruit product 3006](https://www.adafruit.com/product/3006))
 
 Motor / power electronics:
 
@@ -320,7 +320,7 @@ Motor / power electronics:
 - 1 × Motor SHIM for Pico (Pimoroni)
 - 1 × Motor Connector Shim (MCS) (pack of 2) (use as needed)
 - 1 × Motor Connector Shim Cable pack (2 cables, 150 mm) (one per motor)
-- 1 × Adafruit MOSFET Driver (STEMMA JST PH 2 mm) (for higher current loads or lighting/actuators)
+- 1 × Adafruit MOSFET Driver (STEMMA JST PH 2 mm) (for higher current loads or lighting/actuators — see [Adafruit product 5648](https://www.adafruit.com/product/5648))
 
 Power storage:
 
