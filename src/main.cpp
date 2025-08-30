@@ -7,6 +7,7 @@
 #include "SimpleLED.h"
 #include "MotorController.h"
 #include "audio/00001.h"  // Boot sound
+#include "MosfetDriver.h"
 
 // Guard optional CYW43 include so builds succeed even if headers aren't present
 #if defined(__has_include)
@@ -36,8 +37,9 @@ int main() {
     // Initialize LED status controller for blue eye stalk LED
     LEDStatusController eyeLED;
     // Relocated to a higher GPIO (bottom edge exposed) per hardware mounting requirement.
-    // Choose a pin in the 35-47 range that is free (adjust if conflicts arise).
-    const unsigned int BLUE_LED_PIN = 36; // Blue LED for eye stalk status (was 15 -> 40 -> 36)
+    // Moved out of the 35-43 range to avoid conflicts with external wiring.
+    // Use a high GPIO in the 44-47 range by default.
+    const unsigned int BLUE_LED_PIN = 44; // Blue LED for eye stalk status (previously 36)
     
     if (eyeLED.initialize(BLUE_LED_PIN)) {
         printf("Blue eye LED initialized on GPIO %u\n", BLUE_LED_PIN);
@@ -77,7 +79,8 @@ int main() {
             
             // Two external LEDs driven by audio intensity via PWM (skip onboard LED)
             // Moved to higher GPIO range (35-47) to avoid mechanical blockage and wiring congestion.
-            const unsigned extLedPins[] = {37, 38}; // Red audio LEDs (were 11,12 -> 18,19 -> 41,42 -> 37,38)
+            // Move external audio LEDs out of 35-43 into a lower header-friendly range (13-18)
+            const unsigned extLedPins[] = {13, 14}; // Red audio LEDs (moved from 37,38)
             bool pwmOk[2] = {false, false};
             for (int i = 0; i < 2; ++i) {
                 pwmOk[i] = Exterminate::SimpleLED::initializePwmPin(extLedPins[i], /*wrap*/255, /*clkdiv*/4.0f);
@@ -146,6 +149,13 @@ int main() {
 
     // Set the MotorController for tank-style control using existing gamepadController
     gamepadController.setMotorController(&motorController);
+
+    // Instantiate and register MOSFET driver (use a free GPIO pin)
+    // Move MOSFET control out of 35-43 to the high GPIO region (44-47)
+    const uint8_t MOSFET_CONTROL_PIN = 45; // MOSFET gate control (moved from 43)
+    static Exterminate::MosfetDriver mosfetDriver(MOSFET_CONTROL_PIN);
+    mosfetDriver.initialize();
+    gamepadController.setMosfetDriver(&mosfetDriver);
 
     // Start the gamepad event loop
     gamepadController.startEventLoop();

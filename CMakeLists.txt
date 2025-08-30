@@ -49,6 +49,7 @@ add_executable(Exterminate
     src/AudioData.cpp
     src/AudioIndex.cpp
     src/SimpleLED.cpp
+    src/MosfetDriver.cpp
     src/MotorController.cpp
     src/GamepadController.cpp
 )

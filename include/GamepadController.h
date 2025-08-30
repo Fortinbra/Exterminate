@@ -12,6 +12,7 @@ namespace Exterminate {
 // Forward declarations
 class MotorController;
 class AudioController;
+class MosfetDriver;
 
 /**
  * @brief Bluetooth connection states for LED status indication
@@ -74,6 +75,11 @@ public:
      * @param audioController Pointer to audio controller (nullptr to disable)
      */
     void setAudioController(AudioController* audioController);
+    /**
+     * @brief Set the MOSFET driver for simple on/off control via gamepad
+     */
+    void setMosfetDriver(MosfetDriver* mosfetDriver);
+        void processMosfetControls(const uni_gamepad_t* gp);
 
     /**
      * @brief Get the singleton instance
@@ -94,6 +100,7 @@ private:
     SimpleLED::LEDStatusController* m_ledController = nullptr;
     MotorController* m_motorController = nullptr;
     AudioController* m_audioController = nullptr;
+        MosfetDriver* m_mosfetDriver = nullptr;
 
     // C callback functions that interface with BluePad32
     static void platformInit(int argc, const char** argv);

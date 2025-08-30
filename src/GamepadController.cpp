@@ -1,6 +1,7 @@
 #include "GamepadController.h"
 #include "MotorController.h"
 #include "AudioController.h"
+#include "MosfetDriver.h"
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
@@ -103,6 +104,13 @@ void GamepadController::setAudioController(AudioController* audioController) {
         printf("GamepadController: Audio controller connected for sound effects\n");
         printf("DEBUG: Audio controller initialized: %s\n", 
                m_audioController->isInitialized() ? "YES" : "NO");
+    }
+}
+
+void GamepadController::setMosfetDriver(MosfetDriver* mosfetDriver) {
+    m_mosfetDriver = mosfetDriver;
+    if (m_mosfetDriver) {
+        printf("GamepadController: MOSFET driver registered\n");
     }
 }
 
@@ -230,6 +238,10 @@ void GamepadController::platformOnControllerData(uni_hid_device_t* d, uni_contro
         // Process tank steering if we have a motor controller
         if (instance.m_motorController) {
             instance.processTankSteering(&ctl->gamepad);
+        }
+        // Process MOSFET controls (Y button toggles MOSFET)
+        if (instance.m_mosfetDriver) {
+            instance.processMosfetControls(&ctl->gamepad);
         }
     }
 }
@@ -438,6 +450,23 @@ void GamepadController::processAudioControls(const uni_gamepad_t* gp) {
     
     // Update previous button state
     previousAButton = currentAButton;
+}
+
+void GamepadController::processMosfetControls(const uni_gamepad_t* gp) {
+    if (!m_mosfetDriver) return;
+
+    static bool previousYButton = false;
+    bool currentYButton = (gp->buttons & BUTTON_Y) != 0;
+
+    if (currentYButton && !previousYButton) {
+        // Button pressed -> turn MOSFET on (full speed)
+        m_mosfetDriver->set(true);
+    } else if (!currentYButton && previousYButton) {
+        // Button released -> turn MOSFET off
+        m_mosfetDriver->set(false);
+    }
+
+    previousYButton = currentYButton;
 }
 
 } // namespace Exterminate
