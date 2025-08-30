@@ -152,15 +152,8 @@ audio_i2s_setup(&format, &config);
 **Files**: `src/AudioController.cpp`, `include/AudioController.h`, `include/audio/*`
 
 **Responsibilities**:
-
-- High-level audio playback management
-- Embedded audio file handling
-- LED integration and audio intensity calculation
 - Volume control and audio mixing
 
-**Architecture**:
-
-- **Embedded Resources**: MP3 files converted to PCM byte arrays
 - **Pico-Extras Integration**: Uses pico-extras I2S library for hardware output
 - **LED Synchronization**: Real-time audio intensity for LED effects
 - **Resource Management**: Compile-time audio file registry

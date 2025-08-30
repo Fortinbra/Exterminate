@@ -14,7 +14,7 @@ A C++ project for Raspberry Pi Pico W that brings an animatronic Dalek to life w
 
 ## 🤖 Project Overview
 
-Exterminate is an animatronic Dalek control system that enables wireless gamepad control of a mobile Dalek replica. The project features differential drive movement, servo-controlled eye stalk movement, and I2S audio playback for the iconic "Exterminate!" sound effects. It demonstrates modern C++ best practices, clean architecture, and SOLID principles while interfacing with embedded hardware.
+Exterminate is a Dalek control system that enables wireless gamepad control of a mobile Dalek replica. The project features differential drive movement and I2S audio playback for the iconic "Exterminate!" sound effects. It demonstrates modern C++ best practices, clean architecture, and SOLID principles while interfacing with embedded hardware.
 
 > **Note**: This is an educational project created for learning purposes. The "Dalek" name and associated content are the intellectual property of the BBC. See the [Copyright Disclaimer](#️-copyright-disclaimer) section for full details.
 
@@ -22,7 +22,7 @@ Exterminate is an animatronic Dalek control system that enables wireless gamepad
 
 - **Bluetooth Gamepad Support**: Uses BluePad32 library for wireless controller connectivity with visual status indication
 - **Differential Drive Control**: Sophisticated two-wheel movement with forward/reverse and turning
-- **DRV8833 Motor Driver**: High-efficiency dual H-bridge motor control with PWM speed regulation
+- **Pimoroni Motor SHIM for Pico (DRV8833-based)**: Motor SHIM breakout providing a DRV8833 dual H-bridge with convenient headers and power wiring (see [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico))
 - **Servo Eye Stalk Control**: Precise servo motor control for authentic Dalek eye movement
 - **PIO-Based I2S Audio**: High-quality 44.1kHz PCM audio output using pico-extras I2S library
 - **Audio-Reactive LEDs**: Real-time LED visualization that pulses with audio intensity for authentic Dalek head lighting
@@ -35,9 +35,8 @@ Exterminate is an animatronic Dalek control system that enables wireless gamepad
 ### Core Components
 
 - **Raspberry Pi Pico W** (RP2350-based board like Pimoroni Pico Plus2 W)
-- **DRV8833 Dual H-Bridge Motor Driver** (for differential drive movement)
+- **Pimoroni Motor SHIM for Pico** (DRV8833-based dual H-bridge for differential drive movement). See: [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico)
 - **Two DC Motors** (geared motors recommended for mobile Dalek base)
-- **Servo Motor** (for eye stalk movement control)
 - **I2S Audio Amplifier** (MAX98357A I2S amplifier for Dalek sound effects playback)
 - **PWM-Compatible LEDs** (4x LEDs for audio visualization, 1x LED for controller status)
 - **Speaker** (4-8Ω speaker, 3W recommended for MAX98357A)
@@ -46,31 +45,25 @@ Exterminate is an animatronic Dalek control system that enables wireless gamepad
 ### Wiring Diagram
 
 ```text
-Pico W -> DRV8833 (Movement)
--------------------------
-GPIO 2 -> AIN1 (Left Motor Direction 1)
-GPIO 3 -> AIN2 (Left Motor Direction 2) 
-GPIO 4 -> BIN1 (Right Motor Direction 1)
-GPIO 5 -> BIN2 (Right Motor Direction 2)
+Pico W -> Pimoroni Motor SHIM (Movement)
+GPIO 6 -> AIN1 (Left Motor Direction 1)
+GPIO 7 -> AIN2 (Left Motor Direction 2)
+GPIO 27 -> BIN1 (Right Motor Direction 1)
+GPIO 26 -> BIN2 (Right Motor Direction 2)
 3V3    -> VCC
 GND    -> GND
 
-DRV8833 -> Motors
------------------
+Motor SHIM (DRV8833) -> Motors
 AOUT1/AOUT2 -> Left Motor
 BOUT1/BOUT2 -> Right Motor
 
-Pico W -> Servo Motor (Eye Stalk)
----------------------------------
-GPIO 16 -> Servo PWM Signal
-5V      -> Servo VCC (or external 5V supply)
-GND     -> Servo GND
+
 
 Pico W -> I2S Audio Amplifier (PIO-based)
 -----------------------------
-GPIO 6  -> I2S BCLK (Bit Clock)
-GPIO 8  -> I2S LRCLK (Left/Right Clock)  
-GPIO 9  -> I2S DIN (Data Input)
+GPIO 32 -> I2S BCLK (Bit Clock)
+GPIO 33 -> I2S LRCLK (Left/Right Clock)
+GPIO 34 -> I2S DOUT (Data Output)
 5V      -> VIN (Power Input)
 GND     -> GND
 
@@ -81,15 +74,13 @@ Speaker- -> Speaker Negative Terminal
 
 Pico W -> Audio Visualization LEDs
 ----------------------------------
-GPIO 11 -> LED 1 (PWM for intensity control)
-GPIO 12 -> LED 2 (PWM for intensity control)
-GPIO 13 -> LED 3 (PWM for intensity control)
-GPIO 14 -> LED 4 (PWM for intensity control)
+GPIO 13 -> External Red LED 1 (PWM for intensity control)
+GPIO 14 -> External Red LED 2 (PWM for intensity control)
 GND     -> LED Cathodes (via current limiting resistors)
 
-Pico W -> Controller Status LED
+Pico W -> Controller Status LED (Eye Stalk)
 -------------------------------
-GPIO 15 -> Status LED (Solid=Connected, Flashing=Waiting)
+GPIO 44 -> Blue eye LED (Status: BREATHING = pairing, SOLID = paired, FAST BLINK = error)
 GND     -> LED Cathode (via current limiting resistor)
 
 I2S Amplifier -> Speaker
@@ -153,7 +144,6 @@ Speaker- -> Speaker Negative Terminal
 
 - **Left Joystick Y-Axis**: Forward/Backward movement
 - **Left Joystick X-Axis**: Steering (differential drive)
-- **Right Joystick**: Eye stalk movement (X/Y axis control)
 - **Right Trigger/Button**: Play "Exterminate!" audio
 - **Face Buttons**: Additional sound effects (if implemented)
 - **Deadzone**: 10% deadzone prevents drift from centered joysticks
@@ -163,7 +153,7 @@ Speaker- -> Speaker Negative Terminal
 ```text
 Movement:     Left stick Y -> Forward/Backward drive
 Steering:     Left stick X -> Differential turning
-Eye Movement: Right stick X/Y -> Servo horizontal/vertical positioning
+<!-- Eye Movement (servo) removed from scope -->
 Audio Trigger: Right trigger -> "Exterminate!" sound effect
 ```
 
@@ -230,9 +220,9 @@ The project follows **SOLID principles** and modern C++ best practices:
 
 #### `MotorController`
 
-- **Purpose**: Hardware abstraction for DRV8833 motor driver and servo control
-- **Features**: PWM speed control, differential drive algorithms, servo positioning, RAII resource management
-- **Interface**: `setMotorSpeed()`, `setDifferentialDrive()`, `stopAllMotors()`, servo control methods
+- **Purpose**: Hardware abstraction for DRV8833-based motor driver
+- **Features**: PWM speed control, differential drive algorithms, RAII resource management
+- **Interface**: `setMotorSpeed()`, `setDifferentialDrive()`, `stopAllMotors()`
 
 #### `AudioController`
 
@@ -256,7 +246,7 @@ The project follows **SOLID principles** and modern C++ best practices:
 
 ```text
 Gamepad Input → BluePad32 → Platform Handler → Motor Controller → Drive Motors (Movement)
-                                            └→ Servo Controller → Eye Stalk Movement  
+                                            └→ (Servo controller removed from scope)
                                             └→ Audio Controller → Pico-Extras I2S → Speaker
                                             └→ LED Controller → PWM LEDs → Audio Visualization
                                             └→ Status LED → Controller Connection Feedback
@@ -377,10 +367,7 @@ While embedded testing is complex, the modular design supports unit testing:
    - Verify power supply to motor driver
    - Test PWM output with oscilloscope/logic analyzer
 
-4. **Eye Stalk Not Moving**:
-   - Check servo wiring and power supply
-   - Verify PWM signal on servo control pin
-   - Test servo with a simple PWM test program
+4. **Eye Stalk Not Moving**: (servo control removed from project scope)
 
 5. **No Audio Output**:
    - Check I2S amplifier wiring and connections

@@ -162,7 +162,7 @@ motors.stopAllMotors();
 **Motors overheat:**
 
 1. Reduce continuous speed
-2. Add heatsink to DRV8833
+2. Add heatsink to the Motor SHIM's DRV8833 (if your workload/ambient temp requires it)
 3. Check for mechanical binding
 4. Verify current draw
 

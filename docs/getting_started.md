@@ -23,7 +23,7 @@ Welcome to the Exterminate Dalek project! This guide will help you get started w
 
 **Motor System:**
 
-- 1x DRV8833 dual motor driver board
+- 1x Pimoroni Motor SHIM for Pico (DRV8833-based dual motor driver board). See: [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico)
 - 2x DC geared motors (6V, up to 1A each)
 - 1x Servo motor (standard 3-wire, 5V)
 - Wheels and chassis materials
@@ -158,10 +158,10 @@ Battery (+) ──→ Power Switch ──→ Voltage Regulator ──→ 5V Rail
 
 ### Motor Connections
 
-**DRV8833 Wiring:**
+**Motor SHIM (DRV8833-based) Wiring:**
 
 ```
-Pico W GPIO    DRV8833 Pin    Function
+Pico W GPIO    Motor SHIM Pin    Function
 ------------   -----------    --------
 GPIO 2      →  AIN1          Motor A Direction 1
 GPIO 3      →  AIN2          Motor A Direction 2  
@@ -175,7 +175,7 @@ Battery+    →  VIN           Motor Power
 **Motor Wiring:**
 
 ```
-DRV8833        Left Motor     Right Motor
+Motor SHIM (DRV8833)        Left Motor     Right Motor
 -------        ----------     -----------
 AOUT1       →  Motor + (A)
 AOUT2       →  Motor - (A)

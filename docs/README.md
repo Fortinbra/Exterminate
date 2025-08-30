@@ -40,11 +40,12 @@ This documentation provides comprehensive information for building, programming,
 - Control mapping and customization options
 - Safety features and emergency stop functionality
 
-**[Motor Control](motor_control.md)** - Movement and servo systems
+
+**[Motor Control](motor_control.md)** - Movement system
 
 - Pimoroni Motor Shim integration and configuration
 - Differential drive mathematics and implementation
-- Servo control for eye stalk movement
+
 - PWM signal generation and timing requirements
 
 ### 🔊 Audio & Visual Systems
@@ -135,7 +136,7 @@ This documentation provides comprehensive information for building, programming,
 - **Wireless**: Built-in Wi-Fi and Bluetooth 5.2 with BluePad32 gamepad support
 - **Movement**: Differential drive with Pimoroni Motor Shim
 - **Audio**: I2S DAC output with embedded MP3 sound effects  
-- **Servo Control**: PWM-based eye stalk movement control
+- **Servo Control**: (removed from project scope)
 - **Expansion**: Multiple GPIO pins available for additional features
 
 ### Software Architecture
@@ -162,7 +163,7 @@ This documentation provides comprehensive information for building, programming,
 src/
 ├── main.cpp                 # Main application entry point
 ├── AudioController.cpp      # I2S audio system implementation  
-├── MotorController.cpp      # Motor and servo control
+├── MotorController.cpp      # Motor control
 ├── exterminate_platform.cpp # BluePad32 platform integration
 ├── btstack_config.h         # Bluetooth stack configuration
 └── sdkconfig.h             # SDK configuration options

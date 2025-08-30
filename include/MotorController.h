@@ -7,9 +7,12 @@
 namespace Exterminate {
 
 /**
- * @brief Driver for the DRV8833 Dual H-Bridge Motor Driver
+ * @brief Driver for DRV8833-based motor H-bridge (e.g. Pimoroni Motor SHIM for Pico)
  * 
- * This class provides control for two DC motors using the DRV8833 chip.
+ * This class provides control for two DC motors using a DRV8833-based H-bridge
+ * such as the Pimoroni Motor SHIM for Pico. The SHIM simplifies wiring and
+ * power distribution while the underlying code targets the DRV8833 control
+ * interface (direction pins + PWM for speed control).
  * It follows RAII principles and provides differential drive control
  * suitable for a two-wheeled robot.
  */
