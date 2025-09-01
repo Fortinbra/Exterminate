@@ -32,7 +32,6 @@ The Exterminate Dalek project implements a modular, real-time control system for
                     │  Motor Control  │
                     │  I2S Audio      │
                     │  LED System     │
-                    │  Servo Control  │
                     └─────────────────┘
 ```
 

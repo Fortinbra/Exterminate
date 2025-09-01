@@ -132,12 +132,7 @@ This documentation provides comprehensive information for building, programming,
 
 ### Hardware Capabilities
 
-- **Microcontroller**: Raspberry Pi Pico W (RP2350) with dual-core Cortex-M33
-- **Wireless**: Built-in Wi-Fi and Bluetooth 5.2 with BluePad32 gamepad support
-- **Movement**: Differential drive with Pimoroni Motor Shim
-- **Audio**: I2S DAC output with embedded MP3 sound effects  
-- **Servo Control**: (removed from project scope)
-- **Expansion**: Multiple GPIO pins available for additional features
+ 
 
 ### Software Architecture
 

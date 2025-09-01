@@ -1,16 +1,14 @@
 # Exterminate
 
-> **⚠️ Development Status Notice**
+> **✅ Development Status**
 > 
-> This project is currently **untested on physical hardware** as the author is awaiting component delivery. The codebase has been developed with significant assistance from **GitHub Copilot (Claude Sonnet 3.5)** and represents a theoretical implementation based on datasheets and established embedded development practices.
+> This project has been tested on physical hardware (Pimoroni Pico LiPo 2 XL W) and verified to run core features including Bluetooth gamepad control, differential drive movement, and I2S audio playback. The codebase was developed with assistance from GitHub Copilot and refined through hands-on testing by the author and contributors.
 > 
 > **Key Dependencies**: Built upon [BluePad32](https://github.com/ricardoquesada/bluepad32) for Bluetooth gamepad support and [rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) for PIO-based I2S audio implementation.
 > 
-> **Use at your own discretion** - While the code follows industry best practices and is based on proven techniques, real-world testing may reveal issues that require adjustment.
-> 
-> **Pull Requests Welcome!** - If you have the hardware and test this project, please contribute fixes, improvements, or validation reports. Community testing and contributions are highly valued!
+> **Notes**: While the project is tested and functioning, additional edge cases and hardware revisions may surface further issues. Contributions, bug reports, and validation against different hardware revisions are welcome.
 
-A C++ project for Raspberry Pi Pico W that brings an animatronic Dalek to life with Bluetooth gamepad control, differential drive movement, servo-controlled eye stalk movement, and iconic audio playback.
+A C++ project for the Pimoroni Pico LiPo 2 XL W that brings an animatronic Dalek to life with Bluetooth gamepad control, differential drive movement, and iconic audio playback.
 
 ## 🤖 Project Overview
 
@@ -23,7 +21,6 @@ Exterminate is a Dalek control system that enables wireless gamepad control of a
 - **Bluetooth Gamepad Support**: Uses BluePad32 library for wireless controller connectivity with visual status indication
 - **Differential Drive Control**: Sophisticated two-wheel movement with forward/reverse and turning
 - **Pimoroni Motor SHIM for Pico (DRV8833-based)**: Motor SHIM breakout providing a DRV8833 dual H-bridge with convenient headers and power wiring (see [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico))
-- **Servo Eye Stalk Control**: Precise servo motor control for authentic Dalek eye movement
 - **PIO-Based I2S Audio**: High-quality 44.1kHz PCM audio output using pico-extras I2S library
 - **Audio-Reactive LEDs**: Real-time LED visualization that pulses with audio intensity for authentic Dalek head lighting
 - **Controller Status LED**: Visual feedback showing controller connection status (solid when paired, flashing when waiting)
@@ -34,7 +31,7 @@ Exterminate is a Dalek control system that enables wireless gamepad control of a
 
 ### Core Components
 
-- **Raspberry Pi Pico W** (RP2350-based board like Pimoroni Pico Plus2 W)
+- **Pimoroni Pico LiPo 2 XL W** (RP2350-based board; this is the board used for testing)
 - **Pimoroni Motor SHIM for Pico** (DRV8833-based dual H-bridge for differential drive movement). See: [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico)
 - **Two DC Motors** (geared motors recommended for mobile Dalek base)
 - **I2S Audio Amplifier** (Adafruit MAX98357A I2S amplifier breakout — see [Adafruit MAX98357A Breakout (Product 3006)](https://www.adafruit.com/product/3006))
@@ -120,15 +117,6 @@ Speaker- -> Speaker Negative Terminal
    cd build
    cmake .. -G Ninja
    ```
-
-4. **Compile the project**:
-
-   ```bash
-   ninja
-   ```
-
-5. **Flash to Pico W**:
-   - Hold BOOTSEL button while connecting USB
    - Copy `build/Exterminate.uf2` to the mounted drive
    - Or use: `picotool load Exterminate.uf2 -fx`
 
@@ -148,12 +136,10 @@ Speaker- -> Speaker Negative Terminal
 - **Face Buttons**: Additional sound effects (if implemented)
 - **Deadzone**: 10% deadzone prevents drift from centered joysticks
 
-### Control Mapping
 
 ```text
 Movement:     Left stick Y -> Forward/Backward drive
 Steering:     Left stick X -> Differential turning
-<!-- Eye Movement (servo) removed from scope -->
 Audio Trigger: Right trigger -> "Exterminate!" sound effect
 ```
 
@@ -246,7 +232,6 @@ The project follows **SOLID principles** and modern C++ best practices:
 
 ```text
 Gamepad Input → BluePad32 → Platform Handler → Motor Controller → Drive Motors (Movement)
-                                            └→ (Servo controller removed from scope)
                                             └→ Audio Controller → Pico-Extras I2S → Speaker
                                             └→ LED Controller → PWM LEDs → Audio Visualization
                                             └→ Status LED → Controller Connection Feedback
@@ -303,6 +288,7 @@ python tools\mp3_to_header.py misc include\audio
 ```
 
 **Audio Usage:**
+
 ```cpp
 #include "AudioController.h"
 #include "audio/audio_index.h"
@@ -357,31 +343,31 @@ While embedded testing is complex, the modular design supports unit testing:
    - Check CMake and Ninja versions
    - Verify git submodules are initialized
 
-2. **Gamepad Not Connecting**:
+1. **Gamepad Not Connecting**:
    - Check gamepad compatibility with BluePad32
    - Verify Bluetooth functionality on Pico W
    - Try resetting gamepad to pairing mode
 
-3. **Motors Not Responding**:
+1. **Motors Not Responding**:
    - Check wiring connections to DRV8833
    - Verify power supply to motor driver
    - Test PWM output with oscilloscope/logic analyzer
 
-4. **Eye Stalk Not Moving**: (servo control removed from project scope)
+ 
 
-5. **No Audio Output**:
+1. **No Audio Output**:
    - Check I2S amplifier wiring and connections
    - Verify MAX98357A power supply (5V required)
    - Ensure speaker impedance is 4-8Ω
    - Check SD pin is tied to 3V3 (shutdown control)
    - Test I2S signals with oscilloscope or logic analyzer
 
-6. **Compilation Errors**:
+1. **Compilation Errors**:
    - Ensure C++17 standard is enabled
    - Check include paths for BluePad32
    - Verify btstack configuration files
 
-7. **DMA Channel Conflicts** (Critical Fix Applied):
+1. **DMA Channel Conflicts** (Critical Fix Applied):
    - **Symptoms**: Runtime panic "DMA channel X is already claimed", LED staying solid, gamepad not pairing
    - **Root Cause**: Pico-extras I2S library expects to manage its own resources internally
    - **Solution**: Resource discovery pattern implemented in AudioController::initialize()
@@ -397,6 +383,7 @@ pico_enable_stdio_usb(Exterminate 1)
 ```
 
 Monitor output:
+
 ```bash
 # Windows
 # Use PuTTY or similar terminal emulator
@@ -416,7 +403,7 @@ screen /dev/ttyACM0 115200
 
 ### Hardware Libraries
 
-- **hardware_pwm**: PWM generation for motor and servo control
+-- **hardware_pwm**: PWM generation for motor control
 - **hardware_i2s**: I2S audio output with MAX98357A amplifier
 - **hardware_gpio**: GPIO pin control and configuration
 - **pico_stdlib**: Standard Pico functionality
@@ -425,6 +412,7 @@ screen /dev/ttyACM0 115200
 
 - **I2S Implementation**: Based on [malacalypse/rp2040_i2s_example](https://github.com/malacalypse/rp2040_i2s_example) - Excellent reference for PIO-based I2S audio output
 - **BluePad32 Integration**: Comprehensive Bluetooth gamepad library by Ricardo Quesada
+- **Printables Animated Dalek (Rick100)**: This project was inspired by and is a remix of Rick100's "Animated Dalek with Sound" model on Printables — [Animated Dalek with Sound](https://www.printables.com/model/1351261-animated-dalek-with-sound) (credit: Rick100)
 
 ## 🤝 Contributing
 
@@ -461,7 +449,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## ⚠️ Copyright Disclaimer
 
-**Important Notice Regarding Intellectual Property**
+### Important Notice Regarding Intellectual Property
 
 The "Dalek" name, character design, and associated audio content (including "Exterminate!" and other phrases) are the intellectual property of the BBC and are protected by copyright. This project uses these elements purely for:
 
@@ -474,6 +462,7 @@ The "Dalek" name, character design, and associated audio content (including "Ext
 **Audio Content**: Users are responsible for ensuring they have appropriate rights to any audio files they use with this system. The project provides tools for audio conversion but does not include copyrighted audio content.
 
 **For Educational Use**: This project is intended to help students and hobbyists learn about:
+
 - Embedded C++ programming
 - Real-time audio processing
 - Robotics and motor control
@@ -490,13 +479,16 @@ If you are affiliated with the BBC or hold rights to the Dalek intellectual prop
 
 - **Multiple Audio Samples**: Expand library of Dalek sound effects and phrases
 - **Voice Modulation**: Real-time voice processing to sound like a Dalek
-- **Eye Stalk Lighting**: LED control for eye stalk illumination effects
+-- **Eye Stalk Lighting**: LED control for head illumination effects
 - **Motion Sensors**: Trigger audio/movement based on proximity detection
 - **Remote Web Interface**: Control Dalek via web browser for demonstrations
 
-### Hardware Expansions
+-### Hardware Expansions
 
-- **Additional Servos**: Add more articulation for dome rotation or weapon arm movement
+- **LED Matrix/Displays**: Add visual effects and status indicators
+-- **Proximity Sensors**: Automatic target detection and response
+-- **Camera Module**: First-person view from the Dalek's perspective
+-- **Voice Recognition**: Respond to specific voice commands
 - **LED Matrix/Displays**: Add visual effects and status indicators
 - **Proximity Sensors**: Automatic target detection and response
 - **Camera Module**: First-person view from the Dalek's perspective

@@ -228,10 +228,7 @@ if (gp->buttons & BUTTON_X) {
     audioController->playSound(SOUND_EXTERMINATE);
 }
 
-if (gp->buttons & BUTTON_Y) {
-    // Control eye stalk servo
-    eyeStalkController->moveToPosition(targetAngle);
-}
+// (Servo support removed from this version)
 ```
 
 ### Multiple Controller Support

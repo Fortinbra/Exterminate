@@ -4,7 +4,7 @@ This project now uses a lightweight SimpleLED helper instead of the previous LED
 
 ## LEDs overview
 
-- Eye stalk: 1 blue LED (Bluetooth status) on GPIO 36 (moved from GPIO 15 -> 40 -> 36). Breathing while pairing, solid when paired.
+-- Status LED: 1 blue LED (Bluetooth status) on GPIO 36 (moved from GPIO 15 -> 40 -> 36). Breathing while pairing, solid when paired.
 - Dome: 2 red LEDs (audio visualization) on GPIO 37 and GPIO 38 (moved from GPIO 11/12 -> 18/19 -> 41/42 -> 37/38) driven by PWM.
 
 ## Audio visualization LEDs
@@ -25,7 +25,7 @@ GPIO 38  -----> LED 2 (red) Anode (via 150Ω; 100Ω if brighter)
 GND      -----> Both cathodes
 ```
 
-Wiring (eye-stalk status LED):
+Wiring (status LED):
 
 ```text
 Pico W          LED (Blue)

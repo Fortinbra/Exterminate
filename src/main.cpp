@@ -80,7 +80,7 @@ int main() {
             // Two external LEDs driven by audio intensity via PWM (skip onboard LED)
             // Moved to higher GPIO range (35-47) to avoid mechanical blockage and wiring congestion.
             // Move external audio LEDs out of 35-43 into a lower header-friendly range (13-18)
-            const unsigned extLedPins[] = {13, 14}; // Red audio LEDs (moved from 37,38)
+            const unsigned extLedPins[] = {14, 15}; // Red audio LEDs (moved from 37,38) -> now using 14,15
             bool pwmOk[2] = {false, false};
             for (int i = 0; i < 2; ++i) {
                 pwmOk[i] = Exterminate::SimpleLED::initializePwmPin(extLedPins[i], /*wrap*/255, /*clkdiv*/4.0f);

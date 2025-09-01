@@ -9,7 +9,6 @@ Welcome to the Exterminate Dalek project! This guide will help you get started w
 - A Bluetooth-controlled animatronic Dalek
 - Differential drive movement system
 - Sound effects with I2S audio output  
-- Eye stalk servo control
 - Responsive gamepad controls
 
 ## What You Need
@@ -25,7 +24,6 @@ Welcome to the Exterminate Dalek project! This guide will help you get started w
 
 - 1x Pimoroni Motor SHIM for Pico (DRV8833-based dual motor driver board). See: [Pimoroni Motor SHIM for Pico](https://shop.pimoroni.com/products/motor-shim-for-pico)
 - 2x DC geared motors (6V, up to 1A each)
-- 1x Servo motor (standard 3-wire, 5V)
 - Wheels and chassis materials
 
 **Audio System:**
@@ -146,8 +144,7 @@ Battery (+) ──→ Power Switch ──→ Voltage Regulator ──→ 5V Rail
                     └──→ Motor Driver VIN (6-12V)
 
 5V Rail ──→ Pico W VIN (Pin 39)
-       ├──→ Servo Power (Red wire)
-       └──→ I2S DAC VCC
+   └──→ I2S DAC VCC
 ```
 
 **Important Notes:**
@@ -204,19 +201,6 @@ GND         →  GND           Ground
 - Connect through audio amplifier for higher volume
 - Use 4-8Ω speaker rated for 3-5W
 
-### Servo Control
-
-**Servo Wiring:**
-
-```
-Servo Wire     Pico W Pin     Function
-----------     ----------     --------
-Red         →  5V (Pin 40)   Power
-Black/Brown →  GND           Ground  
-Yellow/White→  GPIO 16       PWM Signal
-```
-
-## Software Configuration
 
 ### Audio Setup
 
@@ -300,12 +284,7 @@ After adding new audio files:
 3. Verify sound effects play correctly
 4. Adjust volume if using amplifier
 
-**Servo Test:**
-
-1. Connect servo to eye stalk mechanism
-2. Use right analog stick Y-axis
-3. Verify smooth movement up and down
-4. Check for proper center position
+ 
 
 ## Common Issues and Solutions
 

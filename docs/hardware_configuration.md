@@ -53,7 +53,7 @@ The project uses the Pico LiPo 2 XL W form-factor board. Refer to the following 
 | **13** | *Reserved* | Future Expansion | - | Available |
 | **14** | *Reserved* | Future Expansion | - | Available |
 | **15** | Blue Status LED | Eye Stalk Bluetooth Status | Output | Digital Control |
-| **16** | Servo PWM | Eye Stalk Servo | Output | 50Hz PWM |
+| **16** | *Reserved* | Future expansion | - | - |
 | **17-25** | *Reserved* | Future Expansion | - | Available |
 | **26** | BIN2 | Right Motor Pin 2 (Motor Shim) | Output | PWM Control |
 | **27** | BIN1 | Right Motor Pin 1 (Motor Shim) | Output | PWM Control |
@@ -105,23 +105,7 @@ MOTOR B +/-  Right motor terminals (connect to motor)
 - Provide adequate motor supply per Pimoroni specs; do not power motors from Pico 3V3.
 - Keep 20 kHz PWM to move switching out of audible range.
 
-### Eye Stalk Servo
-
-**Standard Servo Wiring:**
-
-```text
-Servo Wire  Pico W      Function
-----------  ------      --------
-Red    -->  VSYS        Power (5V)
-Brown  -->  GND         Ground
-Orange -->  GPIO 16     PWM Signal
-```
-
-**PWM Signal Requirements:**
-
-- **Frequency**: 50Hz (20ms period)
-- **Pulse Width**: 1-2ms (1ms = 0°, 1.5ms = 90°, 2ms = 180°)
-- **Logic Level**: 3.3V (compatible with most 5V servos)
+ 
 
 ### I2S Audio Amplifier
 
@@ -213,7 +197,7 @@ LED -       -->  GND         Ground (via series resistor: blue 100–150Ω)
 | Pico W | 3.3V | 150mA | 0.5W |
 | Motor Shim Logic | 3.3V | 10mA | 0.03W |
 | Motors (2x) | 5-6V | 1A each | 5-6W |
-| Servo | 5V | 500mA | 2.5W |
+ 
 | Audio DAC | 3.3V | 50mA | 0.17W |
 | **Total** | - | **~2.7A** | **~8.2W** |
 
@@ -245,7 +229,7 @@ External 6V Supply
 VSYS      Motor Shim VMOTOR
 (Pico)    (Motor Power)
    |
-   +--- Servo Power
+   
 ```
 
 ## Assembly Guidelines
@@ -280,11 +264,7 @@ VSYS      Motor Shim VMOTOR
 - Use flexible wires to accommodate movement
 - Add encoder feedback if precise positioning needed
 
-**Servo Mounting:**
-
-- Mount servo horn securely to eye stalk mechanism
-- Ensure full range of motion without binding
-- Use appropriate torque limits to prevent damage
+ 
 
 ## Development Setup
 
@@ -345,7 +325,7 @@ GND    -->  GND         Ground
 **Moving Parts:**
 
 - Ensure all rotating parts are properly guarded
-- Use appropriate servo torque limits
+ 
 - Implement software position limits
 - Add manual emergency stop capability
 
@@ -374,12 +354,7 @@ GND    -->  GND         Ground
 3. Test motor continuity and resistance
 4. Ensure adequate power supply current
 
-**Servo Not Responding:**
-
-1. Check 5V power supply to servo
-2. Verify PWM signal frequency (50Hz)
-3. Test servo with known-good controller
-4. Check for mechanical binding
+ 
 
 **Audio Issues:**
 
@@ -399,7 +374,7 @@ GND    -->  GND         Ground
 **PWM Signals:**
 
 - GPIO 6,7,26,27: Should show PWM when motors active
-- GPIO 16: Should show 50Hz PWM when servo active
+ 
 - GPIO 32-34: Should show I2S signals when audio playing
 
 This hardware configuration provides a robust foundation for the Exterminate Dalek project with clear upgrade paths and comprehensive safety considerations.
